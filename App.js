@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { StyleSheet, View, ScrollView, Text, Platform } from 'react-native'
+import { StyleSheet, View, Dimensions, Text, Platform } from 'react-native'
 import { DangerZone, GestureHandler, Font, Icon
 } from 'expo'
 
@@ -9,6 +9,9 @@ const {
   TapGestureHandler,
   State,
 } = GestureHandler
+
+
+const { height } = Dimensions.get('window');
 
 
 
@@ -29,6 +32,7 @@ const magic = {
   bouncyFactor: 0.5,
   velocityFactor: P(1, 1.2),
   dampingForMaster: 23,
+  tossForMaster: 0.4,
 } // pls do it better
 
 const {
@@ -41,12 +45,13 @@ const {
   restDisplacementThreshold,
   deceleration,
   bouncyFactor,
-  velocityFactor
+  velocityFactor,
+  tossForMaster
 } = magic;
 
 
 
-const { set, cond, onChange, block, eq, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
+const { set, cond, onChange, block, eq, min, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
 
 function withEnhancedLimits(val, min, max, state, springClock) {
   const prev = new Animated.Value(0)
@@ -78,13 +83,13 @@ function withEnhancedLimits(val, min, max, state, springClock) {
               set(limitedVal, sub(limitedVal, sub(val, prev))),
               // and use derivative of sqrt(x)
               set(limitedVal,
-                sub(limitedVal,
-                  multiply(
-                    (divide(1, multiply(bouncyFactor, sqrt(abs(sub(min, sub(limitedVal, sub(prev, val)))))))),
-                    (sub(prev, val))
-                  )
+              sub(limitedVal,
+                multiply(
+                  (divide(1, multiply(bouncyFactor, sqrt(abs(sub(min, sub(limitedVal, sub(prev, val)))))))),
+                  (sub(prev, val))
                 )
-              ),
+              )
+            ),
             ]
           ),
           cond(greaterThan(limitedVal, max),
@@ -94,14 +99,14 @@ function withEnhancedLimits(val, min, max, state, springClock) {
              // set(limitedVal, add(limitedVal, sub(prev, val))),
               set(limitedVal, sub(limitedVal, sub(val, prev))),
               // and use derivative of sqrt(x)
-              set(limitedVal,
+              /*set(limitedVal,
                 add(limitedVal,
                   multiply(
                     (divide(1, multiply(bouncyFactor, sqrt(abs(sub(add(limitedVal, sub(val, prev)), max)))))),
                     (sub(val, prev))
                   )
                 )
-              ),
+              ),*/
             ]
           ),
           set(prev, val),
@@ -177,7 +182,9 @@ function withDecaying(drag, state, decayClock, velocity){
   return block([
     cond(eq(state, State.END),
       [
-        set(valDecayed, runDecay(decayClock, add(drag, offset), velocity, wasStartedFromBegin))
+        cond(drag,
+          set(valDecayed, runDecay(decayClock, add(drag, offset), velocity, wasStartedFromBegin))
+        )
       ],
       [
         stopClock(decayClock),
@@ -227,39 +234,6 @@ function runSpring(clock, value, velocity, dest, damping = damping) {
 }
 
 
-function runSpringForMaster(clock, value, velocity, dest) {
-  const state = {
-    finished: new Value(0),
-    velocity: new Value(0),
-    position: new Value(0),
-    time: new Value(0),
-  }
-
-  const config = {
-    damping: 20,
-    mass,
-    stiffness,
-    overshootClamping,
-    restSpeedThreshold,
-    restDisplacementThreshold,
-    toValue: new Value(0),
-  }
-
-  return [
-    cond(clockRunning(clock), 0, [
-      set(state.finished, 0),
-      set(state.velocity, velocity),
-      set(state.position, value),
-      set(config.toValue, dest),
-      startClock(clock),
-    ]),
-    spring(clock, state, config),
-    cond(state.finished, stopClock(clock)),
-    state.position,
-  ]
-}
-
-
 function withLimits(val, min, max, state){
   const offset = new Animated.Value(0)
   const offsetedVal = add(offset, val)
@@ -275,9 +249,13 @@ function withLimits(val, min, max, state){
 }
 
 export default class Example extends Component {
+  static defaultProps = {
+    snapPoints: [600, 300, 150],
+    initialSnap: 0,
+  }
   constructor(props) {
     super(props)
-    const dragY = new Value(0)
+    const plainDragY = new Value(0)
     const panState = new Value(0)
     this.tapState = new Value(0)
     const velocity = new Value(0)
@@ -290,12 +268,14 @@ export default class Example extends Component {
     this.handlePan = event([
       {
         nativeEvent: ({
-          translationY: dragY,
+          translationY: plainDragY,
           state: panState,
           velocityY: velocity
         })
       },
     ])
+
+
     this.handleMasterPan = event([
       {
         nativeEvent: ({
@@ -306,7 +286,8 @@ export default class Example extends Component {
       },
     ])
 
-    const snapPoints = [0, 100];
+    this.state = Example.getDerivedStateFromProps(props);
+    const { snapPoints } = this.state
     const middlesOfSnapPoints = [];
     for (let i = 1; i < snapPoints.length; i++) {
       middlesOfSnapPoints.push(divide(add(snapPoints[i - 1] + snapPoints[i]), 2));
@@ -314,7 +295,7 @@ export default class Example extends Component {
 
 
     // destination point is a approximation of movement if finger released
-    const destinationPoint = add(dragMasterY, multiply(1, masterVelocity));
+    const destinationPoint = add(dragMasterY, multiply(tossForMaster, masterVelocity));
 
     // method for generating condition for finding the nearest snap point
     const currentSnapPoint = (i = 0) => i + 1 === snapPoints.length ?
@@ -327,11 +308,13 @@ export default class Example extends Component {
     // current snap point desired
     const snapPoint = currentSnapPoint();
 
-    const masterOffset = new Value(0)
+    const dragY = plainDragY
+    //cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
+    //const Y = cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
 
     const masterClock = new Clock()
 
-    const masterOffseted = new Animated.Value(0);
+    const masterOffseted = new Animated.Value(snapPoints[props.initialSnap]);
 
     const prevMasterDrag = new Animated.Value(0)
 
@@ -339,7 +322,6 @@ export default class Example extends Component {
       cond(eq(panMasterState, State.END),
         [
         // set(masterOffset, add(masterOffset, dragMasterY)),
-         set(dragMasterY, 0),
          set(prevMasterDrag, 0),
          set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster))
         ],
@@ -348,14 +330,14 @@ export default class Example extends Component {
 
           set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
           set(prevMasterDrag, dragMasterY),
-          /*cond(eq(panMasterState, State.BEGAN),
-            set(prevMasterDrag, 0),
-          ),*/
+          cond(eq(panMasterState, State.BEGAN),
+            set(dragMasterY, 0),
+          ),
 
        //   set(masterOffseted, add(dragMasterY, masterOffset)),
         ]
       ),
-      masterOffseted
+      max(masterOffseted, snapPoints[0])
     ])
 
     this.handleTap = event([
@@ -387,7 +369,31 @@ export default class Example extends Component {
   )
 
   state = {
-    ready: false
+    ready: false,
+    heightOfHeader: 0,
+    heightOfContent: 0
+  }
+
+  handleLayoutHeader = ({ nativeEvent: {
+    layout: {
+      height : heightOfHeader
+    }
+  } }) => this.setState({
+    heightOfHeader
+  })
+
+  handleLayoutContent = ({ nativeEvent: {
+    layout: {
+      height : heightOfContent
+    }
+  } }) => this.setState({
+    heightOfContent
+  })
+
+  static getDerivedStateFromProps(props) {
+    return {
+      snapPoints: props.snapPoints.map(p => height - p)
+    }
   }
 
   componentDidMount(){
@@ -420,7 +426,9 @@ export default class Example extends Component {
             onGestureEvent={this.handleMasterPan}
             onHandlerStateChange={this.handleMasterPan}
           >
-            <Animated.View>
+            <Animated.View
+              onLayout={this.handleLayoutHeader}
+            >
               <View style={{
                 height: 40,
                 backgroundColor: 'red'
@@ -433,7 +441,7 @@ export default class Example extends Component {
           </PanGestureHandler>
           <View
             style={{
-              height: 400,
+              height: this.props.snapPoints[0] - this.state.heightOfHeader,
               overflow: 'hidden'
             }}
           >
@@ -453,11 +461,14 @@ export default class Example extends Component {
                 <TapGestureHandler
                   onHandlerStateChange={this.handleTap}
                 >
-                  <Animated.View style={{ width: '100%',
-                    transform: [
-                      { translateY: this.Y }
-                    ]
-                  }}>
+                  <Animated.View
+                    style={{ width: '100%',
+                      transform: [
+                          { translateY: this.Y }
+                        ]
+                      }}
+                    onLayout={this.handleLayoutContent}
+                  >
                     {this.renderInner()}
                   </Animated.View>
                 </TapGestureHandler>
@@ -476,8 +487,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5FCFF',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   box: {
     width: IMAGE_SIZE,
