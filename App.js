@@ -10,17 +10,35 @@ const {
   State,
 } = GestureHandler
 
-Font.loadAsync({
-  // This is the font that we are using for our tab bar
-  ...Icon.Ionicons.font,
-  // We include SpaceMono because we use it in HomeScreen.js. Feel free
-  // to remove this if you are not using it in your app
-  'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-})
+
 
 const MonoText = props => (
   <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
 )
+
+const magic = {
+  damping: 7,
+  mass: 1,
+  stiffness: 121.6,
+  overshootClamping: false,
+  restSpeedThreshold: 0.001,
+  restDisplacementThreshold: 0.001,
+  deceleration: 0.999,
+  bouncyFactor: 0.5,
+  velocityFactor: 1.2
+} // pls do it better
+
+const {
+  damping,
+  mass,
+  stiffness,
+  overshootClamping,
+  restSpeedThreshold,
+  restDisplacementThreshold,
+  deceleration,
+  bouncyFactor,
+  velocityFactor
+} = magic;
 
 
 
@@ -58,7 +76,7 @@ function withEnhancedLimits(val, min, max, state, springClock) {
               set(limitedVal,
                 sub(limitedVal,
                   multiply(
-                    (divide(1, multiply(0.5, sqrt(abs(sub(min, sub(limitedVal, sub(prev, val)))))))),
+                    (divide(1, multiply(bouncyFactor, sqrt(abs(sub(min, sub(limitedVal, sub(prev, val)))))))),
                     (sub(prev, val))
                   )
                 )
@@ -74,7 +92,7 @@ function withEnhancedLimits(val, min, max, state, springClock) {
               set(limitedVal,
                 add(limitedVal,
                   multiply(
-                    (divide(1, multiply(0.5, sqrt(abs(sub(add(limitedVal, sub(val, prev)), max)))))),
+                    (divide(1, multiply(bouncyFactor, sqrt(abs(sub(add(limitedVal, sub(val, prev)), max)))))),
                     (sub(val, prev))
                   )
                 )
@@ -97,14 +115,14 @@ function runDecay(clock, value, velocity, wasStartedFromBegin) {
     time: new Value(0),
   }
 
-  const config = { deceleration: 0.999 }
+  const config = { deceleration }
 
   return [
     cond(clockRunning(clock), 0, [
       cond(wasStartedFromBegin, 0, [
         set(wasStartedFromBegin, 1),
         set(state.finished, 0),
-        set(state.velocity, multiply(velocity, 3)),
+        set(state.velocity, multiply(velocity, velocityFactor)),
         set(state.position, value),
         set(state.time, 0),
         startClock(clock),
@@ -145,7 +163,7 @@ function withPreservingAdditiveOffset(drag, state) {
   ])
 }
 
-function withDecaying(drag, state, decayClock){
+function withDecaying(drag, state, decayClock, velocity){
   const valDecayed = new Animated.Value(0)
   const offset = new Animated.Value(0)
   //const decayClock = new Clock()
@@ -154,7 +172,7 @@ function withDecaying(drag, state, decayClock){
   return block([
     cond(eq(state, State.END),
       [
-        set(valDecayed, runDecay(decayClock, add(drag, offset), diff(drag), wasStartedFromBegin))
+        set(valDecayed, runDecay(decayClock, add(drag, offset), velocity, wasStartedFromBegin))
       ],
       [
         stopClock(decayClock),
@@ -180,12 +198,12 @@ function runSpring(clock, value, velocity, dest) {
   }
 
   const config = {
-    damping: 7,
-    mass: 1,
-    stiffness: 121.6,
-    overshootClamping: false,
-    restSpeedThreshold: 0.001,
-    restDisplacementThreshold: 0.001,
+    damping,
+    mass,
+    stiffness,
+    overshootClamping,
+    restSpeedThreshold,
+    restDisplacementThreshold,
     toValue: new Value(0),
   }
 
@@ -221,31 +239,22 @@ function withLimits(val, min, max, state){
 export default class Example extends Component {
   constructor(props) {
     super(props)
-    const dragX = new Value(0)
     const dragY = new Value(0)
-    const scale = new Value(1)
     const panState = new Value(0)
     this.tapState = new Value(0)
-    const scaleState = new Value(0)
+    const velocity = new Value(0)
 
 
     this.handlePan = event([
       {
         nativeEvent: ({
           translationY: dragY,
-          state: panState
+          state: panState,
+          velocityY: velocity
         })
       },
     ])
 
-    this.handleZoom = event([
-      {
-        nativeEvent: {
-          scale,
-          state: scaleState
-        }
-      },
-    ])
 
     this.handleTap = event([
       {
@@ -257,9 +266,7 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    // this.X = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragX, panState), panState), -1000, 1000, panState)
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock), -2000, 0, panState, this.springClock)
-    // this.scale = withLimits(withPreservingMultiplicativeOffset(scale, scaleState), 0.1, 2, scaleState)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity), -2000, 0, panState, this.springClock)
   }
 
   panRef = React.createRef();
@@ -268,8 +275,8 @@ export default class Example extends Component {
 
   renderInner = () => (
     <React.Fragment>
-      {[...Array(55)].map((e, i) => (
-        <View key={i} style={{ width: 100, height: 40, backgroundColor: `#${i%10}88424` }}>
+      {[...Array(60)].map((e, i) => (
+        <View key={i} style={{ width: 200, height: 40, backgroundColor: `#${i%10}88424` }}>
           <MonoText>
             computed
           </MonoText>
@@ -278,11 +285,30 @@ export default class Example extends Component {
     </React.Fragment>
   )
 
+  state = {
+    ready: false
+  }
+
+  componentDidMount(){
+    Font.loadAsync({
+      // This is the font that we are using for our tab bar
+      ...Icon.Ionicons.font,
+      // We include SpaceMono because we use it in HomeScreen.js. Feel free
+      // to remove this if you are not using it in your app
+      'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
+    }).then(() => this.setState({
+      ready: true
+    }))
+  }
+
   render() {
+    if (!this.state.ready) {
+      return null;
+    }
     return (
       <View style={styles.container}>
         <View
-          style={{ height: 200, overflow: 'hidden' }}
+          style={{ height: 400, overflow: 'hidden' }}
         >
           <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), [
             stopClock(this.decayClock),
