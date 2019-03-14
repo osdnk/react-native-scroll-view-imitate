@@ -23,16 +23,18 @@ const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
 
 const magic = {
   damping: P(9, 7),
-  mass: 1,
+  mass: 0.3,
   stiffness: 121.6,
   overshootClamping: true,
   restSpeedThreshold: 0.1,
   restDisplacementThreshold: 0.1,
   deceleration: 0.999,
-  bouncyFactor: 0.5,
+  bouncyFactor: 1,
   velocityFactor: P(1, 1.2),
-  dampingForMaster: 23,
+  dampingForMaster: 50,
   tossForMaster: 0.4,
+  coefForTranslatingVelocities: 5
+
 } // pls do it better
 
 const {
@@ -46,6 +48,7 @@ const {
   deceleration,
   bouncyFactor,
   velocityFactor,
+  coefForTranslatingVelocities,
   tossForMaster
 } = magic;
 
@@ -135,8 +138,8 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
 
       ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
-        set(masterVelocity, velocity),
-        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, velocity, snapPoint, dampingForMaster, wasRunMaster))
+        set(masterVelocity, divide(velocity, coefForTranslatingVelocities)),
+        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
       0
     ], limitedVal)
@@ -199,7 +202,7 @@ function withPreservingAdditiveOffset(drag, state) {
   ])
 }
 
-function withDecaying(drag, state, decayClock, velocity){
+function withDecaying(drag, state, decayClock, velocity, prevent){
   const valDecayed = new Animated.Value(0)
   const offset = new Animated.Value(0)
   //const decayClock = new Clock()
@@ -208,18 +211,19 @@ function withDecaying(drag, state, decayClock, velocity){
   return block([
     cond(eq(state, State.END),
       [
-        cond(drag,
+        cond(prevent,
+          stopClock(decayClock),
           set(valDecayed, runDecay(decayClock, add(drag, offset), velocity, wasStartedFromBegin))
         )
       ],
       [
         stopClock(decayClock),
+        set(prevent, 0),
         cond(eq(state, State.BEGAN), [
           set(wasStartedFromBegin, 0),
           set(offset, add(sub(valDecayed, drag)))
         ]),
         set(valDecayed, add(drag, offset))
-
       ],
     ),
     valDecayed,
@@ -348,6 +352,7 @@ export default class Example extends Component {
 
     const prevMasterDrag = new Animated.Value(0)
     const wasRun = new Animated.Value(0)
+    const preventDecaying = new Animated.Value(0)
 
     //const shouldTriggerSpring = new Animated.Value(0);
 
@@ -362,6 +367,7 @@ export default class Example extends Component {
         ],
         [
           stopClock(masterClock),
+          set(preventDecaying, 1),
           set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
           set(prevMasterDrag, dragMasterY),
           cond(eq(panMasterState, State.BEGAN),
@@ -388,7 +394,7 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll)
   }
 
   panRef = React.createRef();
