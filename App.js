@@ -69,11 +69,11 @@ function withEnhancedLimits(val, min, max, state, springClock) {
         ],
         [
           set(limitedVal, add(limitedVal, sub(val, prev))),
-          cond(and(lessThan(limitedVal, min), lessThan(val, prev)),
+          cond(lessThan(limitedVal, min),
             // derivate of sqrt
             [
               // revert
-              set(limitedVal, add(limitedVal)),
+              set(limitedVal, sub(limitedVal, sub(val, prev))),
               // and use derivative of sqrt(x)
               set(limitedVal,
                 sub(limitedVal,
@@ -85,11 +85,12 @@ function withEnhancedLimits(val, min, max, state, springClock) {
               ),
             ]
           ),
-          cond(and(greaterThan(limitedVal, max)),
+          cond(greaterThan(limitedVal, max),
             // derivate of sqrt
             [
               // revert
-              set(limitedVal, add(limitedVal, sub(prev, val))),
+             // set(limitedVal, add(limitedVal, sub(prev, val))),
+              set(limitedVal, sub(limitedVal, sub(val, prev))),
               // and use derivative of sqrt(x)
               set(limitedVal,
                 add(limitedVal,
