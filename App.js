@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { StyleSheet, View, ScrollView, Text } from 'react-native'
+import { StyleSheet, View, ScrollView, Text, Platform } from 'react-native'
 import { DangerZone, GestureHandler, Font, Icon
 } from 'expo'
 
@@ -16,8 +16,10 @@ const MonoText = props => (
   <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
 )
 
+const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
+
 const magic = {
-  damping: 7,
+  damping: P(9, 7),
   mass: 1,
   stiffness: 121.6,
   overshootClamping: false,
@@ -25,7 +27,7 @@ const magic = {
   restDisplacementThreshold: 0.001,
   deceleration: 0.999,
   bouncyFactor: 0.5,
-  velocityFactor: 1.2
+  velocityFactor: P(1, 1.2)
 } // pls do it better
 
 const {
