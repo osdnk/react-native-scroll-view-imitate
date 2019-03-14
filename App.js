@@ -27,11 +27,13 @@ const magic = {
   restDisplacementThreshold: 0.001,
   deceleration: 0.999,
   bouncyFactor: 0.5,
-  velocityFactor: P(1, 1.2)
+  velocityFactor: P(1, 1.2),
+  dampingForMaster: 23,
 } // pls do it better
 
 const {
   damping,
+  dampingForMaster,
   mass,
   stiffness,
   overshootClamping,
@@ -192,7 +194,7 @@ function withDecaying(drag, state, decayClock, velocity){
 }
 
 
-function runSpring(clock, value, velocity, dest) {
+function runSpring(clock, value, velocity, dest, damping = damping) {
   const state = {
     finished: new Value(0),
     velocity: new Value(0),
@@ -202,6 +204,39 @@ function runSpring(clock, value, velocity, dest) {
 
   const config = {
     damping,
+    mass,
+    stiffness,
+    overshootClamping,
+    restSpeedThreshold,
+    restDisplacementThreshold,
+    toValue: new Value(0),
+  }
+
+  return [
+    cond(clockRunning(clock), 0, [
+      set(state.finished, 0),
+      set(state.velocity, velocity),
+      set(state.position, value),
+      set(config.toValue, dest),
+      startClock(clock),
+    ]),
+    spring(clock, state, config),
+    cond(state.finished, stopClock(clock)),
+    state.position,
+  ]
+}
+
+
+function runSpringForMaster(clock, value, velocity, dest) {
+  const state = {
+    finished: new Value(0),
+    velocity: new Value(0),
+    position: new Value(0),
+    time: new Value(0),
+  }
+
+  const config = {
+    damping: 20,
     mass,
     stiffness,
     overshootClamping,
@@ -247,6 +282,10 @@ export default class Example extends Component {
     this.tapState = new Value(0)
     const velocity = new Value(0)
 
+    const dragMasterY = new Value(0)
+    const panMasterState = new Value(0)
+    const masterVelocity = new Value(0)
+
 
     this.handlePan = event([
       {
@@ -257,7 +296,67 @@ export default class Example extends Component {
         })
       },
     ])
+    this.handleMasterPan = event([
+      {
+        nativeEvent: ({
+          translationY: dragMasterY,
+          state: panMasterState,
+          velocityY: masterVelocity
+        })
+      },
+    ])
 
+    const snapPoints = [0, 100];
+    const middlesOfSnapPoints = [];
+    for (let i = 1; i < snapPoints.length; i++) {
+      middlesOfSnapPoints.push(divide(add(snapPoints[i - 1] + snapPoints[i]), 2));
+    }
+
+
+    // destination point is a approximation of movement if finger released
+    const destinationPoint = add(dragMasterY, multiply(1, masterVelocity));
+
+    // method for generating condition for finding the nearest snap point
+    const currentSnapPoint = (i = 0) => i + 1 === snapPoints.length ?
+      snapPoints[i] :
+      cond(
+        lessThan(destinationPoint, middlesOfSnapPoints[i]),
+        snapPoints[i],
+        currentSnapPoint(i + 1)
+      );
+    // current snap point desired
+    const snapPoint = currentSnapPoint();
+
+    const masterOffset = new Value(0)
+
+    const masterClock = new Clock()
+
+    const masterOffseted = new Animated.Value(0);
+
+    const prevMasterDrag = new Animated.Value(0)
+
+    this.translateMaster = block([
+      cond(eq(panMasterState, State.END),
+        [
+        // set(masterOffset, add(masterOffset, dragMasterY)),
+         set(dragMasterY, 0),
+         set(prevMasterDrag, 0),
+         set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster))
+        ],
+        [
+          stopClock(masterClock),
+
+          set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
+          set(prevMasterDrag, dragMasterY),
+          /*cond(eq(panMasterState, State.BEGAN),
+            set(prevMasterDrag, 0),
+          ),*/
+
+       //   set(masterOffseted, add(dragMasterY, masterOffset)),
+        ]
+      ),
+      masterOffseted
+    ])
 
     this.handleTap = event([
       {
@@ -273,13 +372,12 @@ export default class Example extends Component {
   }
 
   panRef = React.createRef();
-  pinchRef = React.createRef();
   wasRunningBeforeTap = new Animated.Value(0);
 
   renderInner = () => (
     <React.Fragment>
       {[...Array(60)].map((e, i) => (
-        <View key={i} style={{ width: 200, height: 40, backgroundColor: `#${i%10}88424` }}>
+        <View key={i} style={{ height: 40, backgroundColor: `#${i%10}88424` }}>
           <MonoText>
             computed
           </MonoText>
@@ -310,45 +408,64 @@ export default class Example extends Component {
     }
     return (
       <View style={styles.container}>
-        <View
-          style={{ height: 400, overflow: 'hidden' }}
-        >
-          <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), [
-            stopClock(this.decayClock),
-            set(this.wasRunningBeforeTap, clockRunning(this.springClock)),
-            stopClock(this.springClock),
-          ],[
-            cond(eq(this.tapState, State.END), cond(this.wasRunningBeforeTap, startClock(this.springClock))),
-          ]))} />
+        <Animated.View style={{
+          width: '100%',
+          transform: [
+            {
+              translateY: this.translateMaster
+            }
+          ]
+        }}>
           <PanGestureHandler
-            ref={this.panRef}
-            simultaneousHandlers={[this.pinchRef]}
-            onGestureEvent={this.handlePan}
-            onHandlerStateChange={this.handlePan}>
+            onGestureEvent={this.handleMasterPan}
+            onHandlerStateChange={this.handleMasterPan}
+          >
             <Animated.View>
-              <TapGestureHandler
-                onHandlerStateChange={this.handleTap}
-              >
-                <Animated.View style={{ width: '100%',
-                  transform: [
-                    { translateY: this.Y }
-                  ]
-                }}>
-                  {this.renderInner()}
-                </Animated.View>
-              </TapGestureHandler>
+              <View style={{
+                height: 40,
+                backgroundColor: 'red'
+              }}>
+                <Text>
+                  123
+                </Text>
+              </View>
             </Animated.View>
           </PanGestureHandler>
-        </View>
-        <View
-          style={{ height: 200, overflow: 'hidden' }}
-        >
-          <ScrollView>
-            {this.renderInner()}
-          </ScrollView>
-        </View>
+          <View
+            style={{
+              height: 400,
+              overflow: 'hidden'
+            }}
+          >
+            <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), [
+              stopClock(this.decayClock),
+              set(this.wasRunningBeforeTap, clockRunning(this.springClock)),
+              stopClock(this.springClock),
+            ],[
+              cond(eq(this.tapState, State.END), cond(this.wasRunningBeforeTap, startClock(this.springClock))),
+            ]))} />
+            <PanGestureHandler
+              ref={this.panRef}
+              onGestureEvent={this.handlePan}
+              onHandlerStateChange={this.handlePan}
+            >
+              <Animated.View>
+                <TapGestureHandler
+                  onHandlerStateChange={this.handleTap}
+                >
+                  <Animated.View style={{ width: '100%',
+                    transform: [
+                      { translateY: this.Y }
+                    ]
+                  }}>
+                    {this.renderInner()}
+                  </Animated.View>
+                </TapGestureHandler>
+              </Animated.View>
+            </PanGestureHandler>
+          </View>
+        </Animated.View>
       </View>
-
     )
   }
 }
@@ -358,7 +475,6 @@ const IMAGE_SIZE = 200
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
     backgroundColor: '#F5FCFF',
     justifyContent: 'center',
     alignItems: 'center',
