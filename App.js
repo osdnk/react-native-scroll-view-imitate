@@ -55,13 +55,14 @@ const {
 
 const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, topLimit) {
+function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, topLimit, ms) {
   const prev = new Animated.Value(0)
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
   const flagWasRunSpring = new Animated.Value(0)
   const wasRunMaster = new Animated.Value(0)
   const prevLV = new Animated.Value(0);
+  const offset = new Animated.Value(0)
   return block([
     cond(eq(state, State.BEGAN),[
       set(prev, val),
@@ -70,6 +71,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       stopClock(masterClockForOverscroll),
       set(wasRunMaster, 0),
     ], [
+      set(diffPres, sub(prev, val)),
       cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
         [
           set(flagWasRunSpring, 1),
@@ -128,11 +130,20 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       ),
     ]),
     //limitedVal
-    cond(greaterThan(masterOffseted, topLimit), set(limitedVal, prevLV)),
+    set(offset, 0),
+    cond(greaterThan(masterOffseted, topLimit), [
+      /*cond(lessThan(limitedVal, 0),[
+        set(offset, limitedVal),
+        set(limitedVal, 0)
+      ]),*/
+      set(limitedVal, prevLV),
+      //set(offset, 1),
+
+    ]),
     cond(greaterOrEq(limitedVal, 0), [
       //call([clockRunning(masterClock), ([x]) => console.log(x)]),
       //stopClock(masterClock),
-      call([masterOffseted], console.log),
+      //call([masterOffseted], console.log),
       cond(eq(state, State.ACTIVE),
        //   set(panMasterState, 0)
         set(masterOffseted, sub(masterOffseted, diffPres)),
@@ -143,7 +154,16 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
         set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
       0
-    ], limitedVal)
+    ], [
+      cond(eq(state, State.ACTIVE),
+        cond(greaterThan(masterOffseted, topLimit),
+        //   set(panMasterState, 0)
+          set(masterOffseted, sub(masterOffseted, diffPres))
+        ),
+
+      ),
+      limitedVal
+    ])
   ])
 }
 
@@ -395,7 +415,7 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, this.state.snapPoints[0])
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, this.state.snapPoints[0], panMasterState)
   }
 
   panRef = React.createRef();
