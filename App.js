@@ -71,7 +71,6 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       stopClock(masterClockForOverscroll),
       set(wasRunMaster, 0),
     ], [
-      set(diffPres, sub(prev, val)),
       cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
         [
           set(flagWasRunSpring, 1),
@@ -124,13 +123,13 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
               ),*!/
             ]
           ),*/
-          set(diffPres, sub(prev, val)),
-          set(prev, val),
+
         ]
       ),
     ]),
+    set(diffPres, sub(prev, val)),
+    set(prev, val),
     //limitedVal
-    set(offset, 0),
     cond(greaterThan(masterOffseted, topLimit), [
       /*cond(lessThan(limitedVal, 0),[
         set(offset, limitedVal),
