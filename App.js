@@ -70,6 +70,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       stopClock(springClock),
       stopClock(masterClockForOverscroll),
       set(wasRunMaster, 0),
+      set(offset, 0),
     ], [
       cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
         [
@@ -145,10 +146,13 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       //call([masterOffseted], console.log),
       cond(eq(state, State.ACTIVE),
        //   set(panMasterState, 0)
-        set(masterOffseted, sub(masterOffseted, diffPres)),
+        [
+          set(offset, 1),
+         set(masterOffseted, sub(masterOffseted, diffPres)),
+        ]
 
       ),
-      cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
+      cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster)), offset),[
         set(masterVelocity, divide(velocity, coefForTranslatingVelocities)),
         set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
@@ -157,10 +161,18 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       cond(eq(state, State.ACTIVE),
         cond(greaterThan(masterOffseted, topLimit),
         //   set(panMasterState, 0)
-          set(masterOffseted, sub(masterOffseted, diffPres))
+          [
+            set(offset, 1),
+
+            set(masterOffseted, sub(masterOffseted, diffPres))
+          ]
         ),
 
       ),
+      cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster)), offset),[
+        set(masterVelocity, divide(velocity, coefForTranslatingVelocities)),
+        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
+      ]),
       limitedVal
     ])
   ])
