@@ -10,11 +10,7 @@ const {
   State,
 } = GestureHandler
 
-
 const { height } = Dimensions.get('window');
-
-
-
 
 const MonoText = props => (
   <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
@@ -123,44 +119,18 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
             ],
 
           ),
-          /*cond(greaterThan(limitedVal, max),
-            // derivate of sqrt
-            [
-              // revert
-             // set(limitedVal, add(limitedVal, sub(prev, val))),
-              set(limitedVal, sub(limitedVal, sub(val, prev))),
-              // and use derivative of sqrt(x)
-              /!*set(limitedVal,
-                add(limitedVal,
-                  multiply(
-                    (divide(1, multiply(bouncyFactor, sqrt(abs(sub(add(limitedVal, sub(val, prev)), max)))))),
-                    (sub(val, prev))
-                  )
-                )
-              ),*!/
-            ]
-          ),*/
           set(diffPres, sub(prev, val)),
           set(prev, val),
         ]
       ),
     ]),
-    //limitedVal
     cond(greaterOrEq(limitedVal, 0), [
-      //call([clockRunning(masterClock), ([x]) => console.log(x)]),
-      //stopClock(masterClock),
       cond(eq(state, State.ACTIVE),
-       //   set(panMasterState, 0)
-   //     set(masterOffseted, sub(masterOffseted, diffPres)),
-
       ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
 
         set(overval, 0),
         set(overspeed, 0),
-
-        //set(masterVelocity, divide(velocity, coefForTranslat ingVelocities)),
-        //set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
       [
         cond(not(flagFF),
@@ -169,7 +139,6 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
             set(overspeed, velocity),
           ]
           ),
-        call([overval], console.log),
         0
       ]
     ], limitedVal)
@@ -235,8 +204,6 @@ function withPreservingAdditiveOffset(drag, state) {
 function withDecaying(drag, state, decayClock, velocity, prevent){
   const valDecayed = new Animated.Value(0)
   const offset = new Animated.Value(0)
-  //const decayClock = new Clock()
-  // since there might be moar than one clock
   const wasStartedFromBegin = new Animated.Value(0)
   return block([
     cond(eq(state, State.END),
@@ -297,20 +264,6 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, 
   ]
 }
 
-
-function withLimits(val, min, max, state){
-  const offset = new Animated.Value(0)
-  const offsetedVal = add(offset, val)
-  return block([
-    cond(eq(state, State.BEGAN),[
-      cond(lessThan(offsetedVal, min),
-        set(offset, sub(min, val))),
-      cond(greaterThan(offsetedVal, max),
-        set(offset, sub(max, val)))
-    ]),
-    cond(lessThan(offsetedVal, min), min, cond(greaterThan(offsetedVal, max), max, offsetedVal))
-  ])
-}
 
 export default class Example extends Component {
   static defaultProps = {
@@ -377,8 +330,6 @@ export default class Example extends Component {
       );
     // current snap point desired
     const snapPoint = currentSnapPoint();
-    //cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
-    //const Y = cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
 
     const masterClock = new Clock()
     const masterClockForOverscroll = new Clock()
@@ -389,8 +340,6 @@ export default class Example extends Component {
     const preventDecaying = new Animated.Value(0)
     const shouldStop = new Animated.Value(1);
 
-
-    //const shouldTriggerSpring = new Animated.Value(0);
 
     const shouldRelevantOverscroll = and(
 
@@ -409,9 +358,7 @@ export default class Example extends Component {
     this.translateMaster = block([
       cond(and(or(eq(panMasterState, State.END), eq(panMasterState, 0)), not(shouldRelevantOverscroll)),
         [
-        // set(masterOffset, add(masterOffset, dragMasterY)),
          set(prevMasterDrag, 0),
-       //  call([masterOffseted], ([x]) => console.log(x, "XXX", )),
          cond(or(clockRunning(masterClock), not(wasRun)),[
            set(preventDecaying, 1),
 
@@ -439,8 +386,6 @@ export default class Example extends Component {
               set(wasRun, 0),
             ]
           ),
-
-       //   set(masterOffseted, add(dragMasterY, masterOffset)),
         ]
       ),
       max(masterOffseted, snapPoints[0])
