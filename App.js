@@ -15,7 +15,6 @@ const { height } = Dimensions.get('window');
 const MonoText = props => (
   <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
 )
-
 const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
 
 const magic = {
@@ -56,7 +55,7 @@ const { set, cond, onChange, block, eq, greaterOrEq, lessOrEq, call, not, define
 const moreOrLessEq = (a, b, c = 20) => lessThan(abs(sub(a, b)), c)
 
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overval, overspeed, shouldRevert) {
+function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overval, overspeed, shouldRevert, usif) {
   const prev = new Animated.Value(0)
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
@@ -64,6 +63,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
   const wasRunMaster = new Animated.Value(0)
   const revertive = new Animated.Value(0);
   const flagFF = new Animated.Value(0)
+  const ppp = new Animated.Value(0)
   return block([
     set(flagFF, 0),
     cond(eq(state, State.BEGAN),[
@@ -75,12 +75,15 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
     ], [
       cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
         [
+          //   call([shouldRevert], console.warn),
           set(flagWasRunSpring, 1),
           cond(lessThan(limitedVal, min),
             set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), min))
           ),
           cond(greaterThan(limitedVal, max),
-            set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), max))
+            [
+             set(limitedVal, runSpring(springClock, limitedVal, velocity, max))
+            ]
           ),
         ],
         [
@@ -90,14 +93,16 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
          //   set(accumulativeOffset,add(accumulativeOffset, sub(prev, val))),
           set(revertive, limitedVal),
           set(limitedVal, add(limitedVal, sub(val, prev))),
+          usif,
+
           cond(shouldRevert,
             [
               set(overval, add(overval, sub(val, prev))),
               set(overspeed, velocity),
-              call([overval, sub(prev, val)], (v) => console.log("VFV", v)),
+             // call([overval, sub(prev, val)], (v) => console.warn("VFV", v)),
               set(limitedVal, revertive),
               set(flagFF, 1),
-              set(velocity, 0)
+              set(velocity, 0),
             ]),
          // ),
           cond(lessThan(limitedVal, min),
@@ -135,6 +140,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       [
         cond(not(flagFF),
           [
+            call([overval], ([c]) => console.log("mmm", c)),
             set(overval, limitedVal),
             set(overspeed, velocity),
           ]
@@ -163,6 +169,7 @@ function runDecay(clock, value, velocity, wasStartedFromBegin) {
         set(state.velocity, multiply(velocity, velocityFactor)),
         set(state.position, value),
         set(state.time, 0),
+  //      call([clock], console.warn),
         startClock(clock),
       ]),
     ]),
@@ -228,7 +235,7 @@ function withDecaying(drag, state, decayClock, velocity, prevent){
 }
 
 
-function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, unblock = 0) {
+function runSpring(clock, value, velocity, dest, damping = damping, wasRun = false, unblock = 0) {
   const state = {
     finished: new Value(0),
     velocity: new Value(0),
@@ -253,11 +260,12 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, 
       set(state.position, value),
       set(config.toValue, dest),
       cond(wasRun, 0, startClock(clock)),
-      cond(defined(wasRun), set(wasRun, 1)),
+      wasRun ? cond(defined(wasRun), set(wasRun, 1)) : 0,
     ]),
     spring(clock, state, config),
     cond(and(state.finished, clockRunning(clock)), [
       unblock,
+   //   call([clock], ([p]) => console.warn(p, v === 2)),
       stopClock(clock)
     ]),
     state.position,
@@ -362,14 +370,13 @@ export default class Example extends Component {
          cond(or(clockRunning(masterClock), not(wasRun)),[
            set(preventDecaying, 1),
 
-           set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun, unblockScrollIfNeeded))
+           set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun, unblockScrollIfNeeded, 2))
            ]
          ),
         ],
         [
           stopClock(masterClock),
-          call([panMasterState], ([x]) => console.log(x, "XXX")),
-
+          masterClockForOverscroll,
           set(preventDecaying, 1),
           cond(shouldRelevantOverscroll, [
             set(dragMasterY, overdrag),
@@ -401,7 +408,7 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overdrag, overspeed, shouldStop)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overdrag, overspeed, shouldStop, unblockScrollIfNeeded)
   }
 
   panRef = React.createRef();
@@ -498,6 +505,7 @@ export default class Example extends Component {
           >
             <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), [
               stopClock(this.decayClock),
+             // set(this.pd, 1),
               set(this.wasRunningBeforeTap, clockRunning(this.springClock)),
               stopClock(this.springClock),
             ],[
