@@ -14,7 +14,6 @@ const {
 const { height } = Dimensions.get('window');
 
 
-const moreOrLessEq = (a, b) => lessThan(abs(sub(a, b)), 0.5)
 
 
 const MonoText = props => (
@@ -56,7 +55,10 @@ const {
 
 
 
-const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
+const { set, cond, onChange, block, eq, greaterOrEq, lessOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
+
+const moreOrLessEq = (a, b, c = 20) => lessThan(abs(sub(a, b)), c)
+
 
 function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overval, overspeed, shouldRevert) {
   const prev = new Animated.Value(0)
@@ -401,7 +403,7 @@ export default class Example extends Component {
 
 
     const unblockScrollIfNeeded = block([
-      cond(moreOrLessEq(masterOffseted, this.state.snapPoints[0]), set(shouldStop, 0), set(shouldStop, 1)),
+      cond(moreOrLessEq(masterOffseted, this.state.snapPoints[0], 20), set(shouldStop, 0), set(shouldStop, 1)),
 
     ])
     this.translateMaster = block([
