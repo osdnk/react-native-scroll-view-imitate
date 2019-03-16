@@ -56,7 +56,7 @@ const {
 
 const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll) {
+function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overval, overspeed) {
   const prev = new Animated.Value(0)
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
@@ -138,10 +138,17 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
 
       ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
-        //set(masterVelocity, divide(velocity, coefForTranslatingVelocities)),
+        set(overval, 0),
+
+        //set(masterVelocity, divide(velocity, coefForTranslat ingVelocities)),
         //set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
-      0
+      [
+        set(overval, limitedVal),
+        set(overspeed, velocity),
+        call([overval], console.log),
+        0
+      ]
     ], limitedVal)
   ])
 }
@@ -286,7 +293,7 @@ export default class Example extends Component {
   }
   constructor(props) {
     super(props)
-    const plainDragY = new Value(0)
+    const dragY = new Value(0)
     const panState = new Value(0)
     this.tapState = new Value(0)
     const velocity = new Value(0)
@@ -294,12 +301,15 @@ export default class Example extends Component {
     const dragMasterY = new Value(0)
     const panMasterState = new Value(0)
     const masterVelocity = new Value(0)
+    const overdrag = new Animated.Value(0)
+    const overspeed = new Animated.Value(0)
+    const shouldRelevantOverscroll = and(greaterThan(overdrag, 0), eq(panState, State.ACTIVE));
 
 
     this.handlePan = event([
       {
         nativeEvent: ({
-          translationY: plainDragY,
+          translationY: dragY,
           state: panState,
           velocityY: velocity
         })
@@ -341,8 +351,6 @@ export default class Example extends Component {
       );
     // current snap point desired
     const snapPoint = currentSnapPoint();
-
-    const dragY = plainDragY
     //cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
     //const Y = cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
 
@@ -356,18 +364,27 @@ export default class Example extends Component {
 
     //const shouldTriggerSpring = new Animated.Value(0);
 
+
     this.translateMaster = block([
-      cond(eq(panMasterState, State.END),
+      cond(and(or(eq(panMasterState, State.END), eq(panMasterState, 0)), not(shouldRelevantOverscroll)),
         [
         // set(masterOffset, add(masterOffset, dragMasterY)),
          set(prevMasterDrag, 0),
+         call([panState], ([x]) => console.log(x, "XXX")),
          cond(or(clockRunning(masterClock), not(wasRun)),
           set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun))
          ),
         ],
         [
           stopClock(masterClock),
-          set(preventDecaying, 1),
+          call([panMasterState], ([x]) => console.log(x, "XXX")),
+
+          cond(not(shouldRelevantOverscroll, set(preventDecaying, 1))),
+          cond(shouldRelevantOverscroll, [
+            set(dragMasterY, overdrag),
+            set(masterVelocity, overspeed),
+            set(wasRun, 0) //IIII
+          ]),
           set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
           set(prevMasterDrag, dragMasterY),
           cond(eq(panMasterState, State.BEGAN),
@@ -394,7 +411,7 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overdrag, overspeed)
   }
 
   panRef = React.createRef();
