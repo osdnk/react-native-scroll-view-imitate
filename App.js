@@ -14,6 +14,8 @@ const {
 const { height } = Dimensions.get('window');
 
 
+const moreOrLessEq = (a, b) => lessThan(abs(sub(a, b)), 0.5)
+
 
 const MonoText = props => (
   <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
@@ -63,7 +65,9 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
   const flagWasRunSpring = new Animated.Value(0)
   const wasRunMaster = new Animated.Value(0)
   const revertive = new Animated.Value(0);
+  const flagFF = new Animated.Value(0)
   return block([
+    set(flagFF, 0),
     cond(eq(state, State.BEGAN),[
       set(prev, val),
       set(flagWasRunSpring, 0),
@@ -87,7 +91,16 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
           //  greaterThan(accumulativeOffset, 0),
          //   set(accumulativeOffset,add(accumulativeOffset, sub(prev, val))),
           set(revertive, limitedVal),
-            set(limitedVal, add(limitedVal, sub(val, prev))),
+          set(limitedVal, add(limitedVal, sub(val, prev))),
+          cond(shouldRevert,
+            [
+              set(overval, add(overval, sub(val, prev))),
+              set(overspeed, velocity),
+              call([overval, sub(prev, val)], (v) => console.log("VFV", v)),
+              set(limitedVal, revertive),
+              set(flagFF, 1),
+              set(velocity, 0)
+            ]),
          // ),
           cond(lessThan(limitedVal, min),
             // derivate of sqrt
@@ -106,7 +119,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
                 )
               ),
             ],
-            cond(shouldRevert, set(limitedVal, revertive))
+
           ),
           /*cond(greaterThan(limitedVal, max),
             // derivate of sqrt
@@ -134,13 +147,13 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
     cond(greaterOrEq(limitedVal, 0), [
       //call([clockRunning(masterClock), ([x]) => console.log(x)]),
       //stopClock(masterClock),
-      call([masterOffseted], console.log),
       cond(eq(state, State.ACTIVE),
        //   set(panMasterState, 0)
    //     set(masterOffseted, sub(masterOffseted, diffPres)),
 
       ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
+
         set(overval, 0),
         set(overspeed, 0),
 
@@ -148,8 +161,12 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
         //set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
       ]),
       [
-        set(overval, limitedVal),
-        set(overspeed, velocity),
+        cond(not(flagFF),
+          [
+            set(overval, limitedVal),
+            set(overspeed, velocity),
+          ]
+          ),
         call([overval], console.log),
         0
       ]
@@ -242,7 +259,7 @@ function withDecaying(drag, state, decayClock, velocity, prevent){
 }
 
 
-function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0) {
+function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, unblock = 0) {
   const state = {
     finished: new Value(0),
     velocity: new Value(0),
@@ -270,7 +287,10 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0) 
       cond(defined(wasRun), set(wasRun, 1)),
     ]),
     spring(clock, state, config),
-    cond(state.finished, stopClock(clock)),
+    cond(and(state.finished, clockRunning(clock)), [
+      unblock,
+      stopClock(clock)
+    ]),
     state.position,
   ]
 }
@@ -307,7 +327,7 @@ export default class Example extends Component {
     const masterVelocity = new Value(0)
     const overdrag = new Animated.Value(0)
     const overspeed = new Animated.Value(0)
-    const shouldRelevantOverscroll = and(greaterThan(overdrag, 0), eq(panState, State.ACTIVE));
+
 
 
     this.handlePan = event([
@@ -365,18 +385,36 @@ export default class Example extends Component {
     const prevMasterDrag = new Animated.Value(0)
     const wasRun = new Animated.Value(0)
     const preventDecaying = new Animated.Value(0)
+    const shouldStop = new Animated.Value(1);
+
 
     //const shouldTriggerSpring = new Animated.Value(0);
 
+    const shouldRelevantOverscroll = and(
 
+      or(
+        greaterThan(overdrag, 0),
+        and(not(eq(overdrag, 0)), not(moreOrLessEq(masterOffseted, this.state.snapPoints[0])))
+      ),
+
+      eq(panState, State.ACTIVE));
+
+
+    const unblockScrollIfNeeded = block([
+      cond(moreOrLessEq(masterOffseted, this.state.snapPoints[0]), set(shouldStop, 0), set(shouldStop, 1)),
+
+    ])
     this.translateMaster = block([
       cond(and(or(eq(panMasterState, State.END), eq(panMasterState, 0)), not(shouldRelevantOverscroll)),
         [
         // set(masterOffset, add(masterOffset, dragMasterY)),
          set(prevMasterDrag, 0),
-         call([panState], ([x]) => console.log(x, "XXX")),
-         cond(or(clockRunning(masterClock), not(wasRun)),
-          set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun))
+       //  call([masterOffseted], ([x]) => console.log(x, "XXX", )),
+         cond(or(clockRunning(masterClock), not(wasRun)),[
+           set(preventDecaying, 1),
+
+           set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun, unblockScrollIfNeeded))
+           ]
          ),
         ],
         [
@@ -416,7 +454,6 @@ export default class Example extends Component {
 
     this.decayClock = new Clock()
     this.springClock = new Clock()
-    const shouldStop = 1;
     this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, overdrag, overspeed, shouldStop)
   }
 
