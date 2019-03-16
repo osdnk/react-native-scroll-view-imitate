@@ -380,7 +380,7 @@ export default class Example extends Component {
           stopClock(masterClock),
           call([panMasterState], ([x]) => console.log(x, "XXX")),
 
-          cond(not(shouldRelevantOverscroll, set(preventDecaying, 1))),
+          set(preventDecaying, 1),
           cond(shouldRelevantOverscroll, [
             set(dragMasterY, overdrag),
             set(masterVelocity, overspeed),
