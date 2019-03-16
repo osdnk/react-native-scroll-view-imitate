@@ -139,6 +139,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
         set(overval, 0),
+        set(overspeed, 0),
 
         //set(masterVelocity, divide(velocity, coefForTranslat ingVelocities)),
         //set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
