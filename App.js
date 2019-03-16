@@ -78,9 +78,9 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
         [
           set(flagWasRunSpring, 1),
-          /*cond(lessThan(limitedVal, min),
-           // set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), min))
-          ),*/
+          cond(lessThan(limitedVal, min),
+            set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), min))
+          ),
           cond(greaterThan(limitedVal, max),
             set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), max))
           ),
