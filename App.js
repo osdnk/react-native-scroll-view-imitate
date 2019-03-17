@@ -13,7 +13,7 @@ const {
 const { height } = Dimensions.get('window');
 
 const MonoText = props => (
-  <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]} />
+  <Text {...props} style={[props.style]} />
 )
 const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
 
@@ -353,14 +353,14 @@ export default class Example extends Component {
 
       or(
         greaterThan(overdrag, 0),
-        and(not(eq(overdrag, 0)), not(moreOrLessEq(masterOffseted, this.state.snapPoints[0])))
+        and(not(eq(overdrag, 0)), not(moreOrLessEq(masterOffseted, this.state.snapPoints[0], 40)))
       ),
 
       eq(panState, State.ACTIVE));
 
 
     const unblockScrollIfNeeded = block([
-      cond(moreOrLessEq(masterOffseted, this.state.snapPoints[0], 20), set(shouldStop, 0), set(shouldStop, 1)),
+      cond(moreOrLessEq(masterOffseted, this.state.snapPoints[0], 5), set(shouldStop, 0), set(shouldStop, 1)),
 
     ])
     this.translateMaster = block([
