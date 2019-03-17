@@ -436,7 +436,7 @@ export default class Example extends Component {
     ])
 
     this.decayClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, panMasterState, preventDecaying)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), multiply(-1, add(this.state.heightOfContent, this.state.heightOfHeaderAnimated)), 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, panMasterState, preventDecaying)
   }
 
   panRef = React.createRef();
@@ -454,30 +454,27 @@ export default class Example extends Component {
     </React.Fragment>
   )
 
-  state = {
-    ready: false,
-    heightOfHeader: 0,
-    heightOfContent: 0
-  }
 
   handleLayoutHeader = ({ nativeEvent: {
     layout: {
-      height : heightOfHeader
+      height: heightOfHeader
     }
-  } }) => this.setState({
-    heightOfHeader
-  })
+  } }) => {
+      this.state.heightOfHeaderAnimated.setValue(heightOfHeader);
+      this.setState({ heightOfHeader })
+  }
 
   handleLayoutContent = ({ nativeEvent: {
     layout: {
-      height : heightOfContent
+      height
     }
-  } }) => this.setState({
-    heightOfContent
-  })
+  } }) => this.state.heightOfContent.setValue(height - this.props.snapPoints[0])
 
-  static getDerivedStateFromProps(props) {
+
+  static getDerivedStateFromProps(props, state) {
     return {
+      heightOfHeaderAnimated: (state && state.heightOfHeaderAnimated) || new Animated.Value(0),
+      heightOfContent: (state && state.heightOfContent) || new Animated.Value(0),
       initSnap: height - props.snapPoints[0],
       snapPoints: props.snapPoints.map(p => props.snapPoints[0] - p)
     }
