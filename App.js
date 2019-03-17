@@ -56,13 +56,14 @@ const {
 
 const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster) {
+function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster, pd) {
   const prev = new Animated.Value(0)
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
   const flagWasRunSpring = new Animated.Value(0)
-  const accumulativeOffset = new Animated.Value(0);
+  const rev = new Animated.Value(0);
   return block([
+    set(rev, limitedVal),
     cond(eq(state, State.BEGAN),[
       set(prev, val),
       set(flagWasRunSpring, 0),
@@ -129,7 +130,9 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
     set(diffPres, sub(prev, val)),
     set(prev, val),
     //limitedVal
-    cond(greaterOrEq(limitedVal, 0), [
+    cond(or(greaterOrEq(limitedVal, 0),
+      greaterThan(masterOffseted, 0))
+    , [
       //call([clockRunning(masterClock), ([x]) => console.log(x)]),
       //stopClock(masterClock),
     //  call([masterOffseted], console.log),
@@ -138,6 +141,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
         set(masterOffseted, sub(masterOffseted, diffPres)),
 
       ),
+     cond(greaterThan(masterOffseted, 0), set(limitedVal, rev)),
      // cond(eq(state, State.END),
        //   startClock(masterClockForOverscroll, 0)
       //  set(masterOffseted, sub(masterOffseted, diffPres)),
@@ -414,7 +418,7 @@ export default class Example extends Component {
     ])
 
     this.decayClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, preventDecaying)
   }
 
   panRef = React.createRef();
@@ -456,7 +460,8 @@ export default class Example extends Component {
 
   static getDerivedStateFromProps(props) {
     return {
-      snapPoints: props.snapPoints.map(p => height - p)
+      initSnap: height - props.snapPoints[0],
+      snapPoints: props.snapPoints.map(p => props.snapPoints[0] - p)
     }
   }
 
@@ -486,6 +491,9 @@ export default class Example extends Component {
           transform: [
             {
               translateY: this.translateMaster
+            },
+            {
+              translateY: this.state.initSnap
             }
           ]
         }}>
@@ -534,6 +542,7 @@ export default class Example extends Component {
                   <Animated.View
                     style={{ width: '100%',
                       transform: [
+
                           { translateY: this.Y }
                         ]
                       }}
