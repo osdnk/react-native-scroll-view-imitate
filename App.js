@@ -401,7 +401,7 @@ export default class Example extends Component {
        //   set(masterOffseted, add(dragMasterY, masterOffset)),
         ]
       ),
-    masterOffseted
+      max(masterOffseted, snapPoints[0])
     //  max(masterOffseted, snapPoints[0])
     ])
 
