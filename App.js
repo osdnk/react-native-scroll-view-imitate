@@ -124,9 +124,10 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
 
         ]
       ),
-      set(diffPres, sub(prev, val)),
-      set(prev, val),
+
     ]),
+    set(diffPres, sub(prev, val)),
+    set(prev, val),
     //limitedVal
     cond(greaterOrEq(limitedVal, 0), [
       //call([clockRunning(masterClock), ([x]) => console.log(x)]),
