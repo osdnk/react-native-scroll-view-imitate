@@ -61,6 +61,7 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
   const flagWasRunSpring = new Animated.Value(0)
+  const justEndedIfEnded = new Animated.Value(1)
   const rev = new Animated.Value(0);
   return block([
     set(rev, limitedVal),
@@ -145,20 +146,27 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
 
       ),
      //cond(not(eq(ms, State.ACTIVE)), not(eq(ms, State.BEGAN)),
-      cond(greaterThan(masterOffseted, 0), set(limitedVal, 0)),
+        cond(greaterThan(masterOffseted, 0), [
+          set(limitedVal, 0)
+        ]),
+     // cond(greaterThan(masterOffseted, 0), set(limitedVal, prev ), set(limitedVal)),
      // cond(eq(state, State.END),
        //   startClock(masterClockForOverscroll, 0)
       //  set(masterOffseted, sub(masterOffseted, diffPres)),
 
      // ),
+        cond(not(eq(state, State.END)), set(justEndedIfEnded,1)),
       cond(and(eq(state, State.END), not(eq(ms, State.ACTIVE)), not(eq(ms, State.BEGAN)),  or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
-        set(masterVelocity, diff(val)),
+        cond(justEndedIfEnded, set(masterVelocity, diff(val))),
         set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, diff(val), snapPoint, dampingForMaster, wasRunMaster)),
-        set(masterVelocity, 0)
+        cond(justEndedIfEnded, set(masterVelocity, 0))
       ]),
+      cond(eq(state, State.END), set(justEndedIfEnded,0)),
       set(pd, 1),
-      //  cond(and(greaterThan(masterOffseted, 0), not(greaterOrEq(limitedVal, 0))), limitedVal, 0),
+        //cond(and(greaterThan(masterOffseted, 0), not(greaterOrEq(limitedVal, 0))), limitedVal, 0),
+        //cond(and(greaterThan(masterOffseted, 0), limitedVal, 0)),
         0
+      //  limitedVal
       ], [
       set(pd, 0),
       limitedVal
@@ -187,8 +195,9 @@ function runDecay(clock, value, velocity, wasStartedFromBegin) {
         startClock(clock),
       ]),
     ]),
+     // call([clockRunning(clock)], console.warn),
     // set(state.position, value),
-    decay(clock, state, config),
+    cond(clockRunning(clock), decay(clock, state, config)),
     cond(state.finished, stopClock(clock)),
     state.position,
   ]
@@ -238,7 +247,7 @@ function withDecaying(drag, state, decayClock, velocity, prevent){
       ],
       [
         stopClock(decayClock),
-        set(prevent, 0),
+        cond(eq(state, State.BEGAN, set(prevent, 0))),
         cond(eq(state, State.BEGAN), [
           set(wasStartedFromBegin, 0),
           set(offset, add(sub(valDecayed, drag)))
