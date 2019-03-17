@@ -79,10 +79,10 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
         [
           set(flagWasRunSpring, 1),
           cond(lessThan(limitedVal, min),
-            set(limitedVal, runSpring(springClock, limitedVal, velocity, min))
+           // set(limitedVal, runSpring(springClock, limitedVal, velocity, min))
           ),
           cond(greaterThan(limitedVal, max),
-            set(limitedVal, runSpring(springClock, limitedVal, velocity, max))
+           // set(limitedVal, runSpring(springClock, limitedVal, velocity, max))
           ),
         ],
         [
@@ -96,36 +96,36 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
             [
               // revert
              // set(limitedVal, sub(limitedVal, sub(val, prev))),
-              set(limitedVal, sub(limitedVal, sub(val, prev))),
+              set(limitedVal,  min),
 
               // and use derivative of sqrt(x)
-              set(limitedVal,
+              /*set(limitedVal,
                 sub(limitedVal,
                   multiply(
                     (divide(1, multiply(bouncyFactor, sqrt(abs(sub(min, sub(limitedVal, sub(prev, val)))))))),
                     (sub(prev, val))
                   )
                 )
-              ),
+              ),*/
             ]
           ),
-          /*cond(greaterThan(limitedVal, max),
+          cond(greaterThan(limitedVal, max),
             // derivate of sqrt
             [
               // revert
              // set(limitedVal, add(limitedVal, sub(prev, val))),
-              set(limitedVal, sub(limitedVal, sub(val, prev))),
+              //set(limitedVal, sub(limitedVal, sub(val, prev))),
               // and use derivative of sqrt(x)
-              /!*set(limitedVal,
+              /*set(limitedVal,
                 add(limitedVal,
                   multiply(
                     (divide(1, multiply(bouncyFactor, sqrt(abs(sub(add(limitedVal, sub(val, prev)), max)))))),
                     (sub(val, prev))
                   )
                 )
-              ),*!/
+              ),*/
             ]
-          ),*/
+          )
 
         ]
       ),
