@@ -391,6 +391,8 @@ export default class Example extends Component {
 
 
     this.translateMaster = block([
+
+      this.springClock, // fix for android. strange
    //   cond(eq(panState, State.END), set(dragMasterY, 0)),
       cond(eq(panMasterState, State.END),
         [
