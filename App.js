@@ -472,6 +472,9 @@ export default class Example extends Component {
     }))
   }
 
+  master = React.createRef()
+  scroll = React.createRef()
+
   render() {
     if (!this.state.ready) {
       return null;
@@ -487,6 +490,8 @@ export default class Example extends Component {
           ]
         }}>
           <PanGestureHandler
+            ref={this.master}
+            waitFor={this.panRef}
             onGestureEvent={this.handleMasterPan}
             onHandlerStateChange={this.handleMasterPan}
           >
@@ -517,6 +522,7 @@ export default class Example extends Component {
               cond(eq(this.tapState, State.END), cond(this.wasRunningBeforeTap, startClock(this.springClock))),
             ]))} />
             <PanGestureHandler
+              waitFor={this.master}
               ref={this.panRef}
               onGestureEvent={this.handlePan}
               onHandlerStateChange={this.handlePan}
