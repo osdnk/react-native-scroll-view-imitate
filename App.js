@@ -131,15 +131,20 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
     cond(greaterOrEq(limitedVal, 0), [
       //call([clockRunning(masterClock), ([x]) => console.log(x)]),
       //stopClock(masterClock),
-      call([masterOffseted], console.log),
+    //  call([masterOffseted], console.log),
       cond(eq(state, State.ACTIVE),
-       //   set(panMasterState, 0)
-   //     set(masterOffseted, sub(masterOffseted, diffPres)),
+        //  set(panMasterState, 0)
+        set(masterOffseted, sub(masterOffseted, diffPres)),
 
       ),
+     // cond(eq(state, State.END),
+       //   startClock(masterClockForOverscroll, 0)
+      //  set(masterOffseted, sub(masterOffseted, diffPres)),
+
+     // ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
         //set(masterVelocity, divide(velocity, coefForTranslatingVelocities)),
-        //set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, coefForTranslatingVelocities), snapPoint, dampingForMaster, wasRunMaster))
+        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, 1), snapPoint, dampingForMaster, wasRunMaster))
       ]),
       0
     ], limitedVal)
