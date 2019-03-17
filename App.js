@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { StyleSheet, View, Dimensions, Text, Platform } from 'react-native';
 import {
-  DangerZone, GestureHandler, Font, Icon
+  DangerZone, GestureHandler
 } from 'expo';
 
 const { Animated } = DangerZone;
@@ -13,11 +13,6 @@ const {
 
 
 const { height } = Dimensions.get('window');
-
-
-const MonoText = props => (
-  <Text {...props} style={[props.style, { fontFamily: 'space-mono' }]}/>
-);
 
 const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
 
@@ -46,16 +41,14 @@ const {
   restSpeedThreshold,
   restDisplacementThreshold,
   deceleration,
-  bouncyFactor,
   velocityFactor,
-  coefForTranslatingVelocities,
   tossForMaster
 } = magic;
 
 
-const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub, event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated;
+const { set, cond, onChange, block, eq, greaterOrEq, not, defined, max, add, and, Value, spring, or, divide, greaterThan, sub, event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated;
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster, ms, pd) {
+function withEnhancedLimits(val, min, max, state, masterOffseted, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster, ms, pd) {
   const prev = new Animated.Value(0);
   const limitedVal = new Animated.Value(0);
   const diffPres = new Animated.Value(0);
@@ -64,41 +57,14 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
   const rev = new Animated.Value(0);
   return block([
     set(rev, limitedVal),
-    cond(eq(state, State.END), [
-      //  set(wasRunMaster, 1),
-    ]),
     cond(eq(state, State.BEGAN), [
       set(prev, val),
       set(flagWasRunSpring, 0),
-      stopClock(springClock),
       stopClock(masterClockForOverscroll),
       set(wasRunMaster, 0),
     ], [
-      cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), and(flagWasRunSpring, not(clockRunning(springClock)))),
-        [
-          set(flagWasRunSpring, 1),
-          cond(lessThan(limitedVal, min),
-            // set(limitedVal, runSpring(springClock, limitedVal, velocity, min))
-          ),
-          cond(greaterThan(limitedVal, max),
-            // set(limitedVal, runSpring(springClock, limitedVal, velocity, max))
-          ),
-        ],
-        [
-          set(limitedVal, add(limitedVal, sub(val, prev))),
-          cond(lessThan(limitedVal, min),
-            [
-              set(limitedVal, min),
-            ]
-          ),
-          cond(greaterThan(limitedVal, max),
-            [
-            ]
-          )
-
-        ]
-      ),
-
+        set(limitedVal, add(limitedVal, sub(val, prev))),
+        cond(lessThan(limitedVal, min), set(limitedVal, min)),
     ]),
     set(diffPres, sub(prev, val)),
     set(prev, val),
@@ -295,7 +261,6 @@ export default class Example extends Component {
     const snapPoint = currentSnapPoint();
 
     const dragY = plainDragY;
-    this.springClock = new Clock();
 
 
     const masterClock = new Clock();
@@ -307,7 +272,6 @@ export default class Example extends Component {
     const preventDecaying = new Animated.Value(0);
     const wasRunMasterForOverscroll = new Animated.Value(0);
     this.translateMaster = block([
-      this.springClock, // fix for android. strange
       cond(eq(panMasterState, State.END),
         [
           set(prevMasterDrag, 0),
@@ -316,9 +280,6 @@ export default class Example extends Component {
           ),
         ],
         [
-          cond(eq(panMasterState, State.BEGAN),
-            stopClock(this.springClock),
-          ),
           stopClock(masterClock),
           set(preventDecaying, 1),
           set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
@@ -343,19 +304,18 @@ export default class Example extends Component {
     ]);
 
     this.decayClock = new Clock();
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), multiply(-1, add(this.state.heightOfContent, this.state.heightOfHeaderAnimated)), 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, panMasterState, preventDecaying);
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), multiply(-1, add(this.state.heightOfContent, this.state.heightOfHeaderAnimated)), 0, panState, masterOffseted, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, panMasterState, preventDecaying);
   }
 
   panRef = React.createRef();
-  wasRunningBeforeTap = new Animated.Value(0);
 
   renderInner = () => (
     <React.Fragment>
       {[...Array(60)].map((e, i) => (
         <View key={i} style={{ height: 40, backgroundColor: `#${i % 10}88424` }}>
-          <MonoText>
+          <Text>
             computed
-          </MonoText>
+          </Text>
         </View>
       ))}
     </React.Fragment>
@@ -391,25 +351,9 @@ export default class Example extends Component {
     };
   }
 
-  componentDidMount() {
-    Font.loadAsync({
-      // This is the font that we are using for our tab bar
-      ...Icon.Ionicons.font,
-      // We include SpaceMono because we use it in HomeScreen.js. Feel free
-      // to remove this if you are not using it in your app
-      'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-    }).then(() => this.setState({
-      ready: true
-    }));
-  }
-
   master = React.createRef();
-  scroll = React.createRef();
 
   render() {
-    if (!this.state.ready) {
-      return null;
-    }
     return (
       <View style={styles.container}>
         <Animated.View style={{
@@ -448,13 +392,7 @@ export default class Example extends Component {
               overflow: 'hidden'
             }}
           >
-            <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), [
-              stopClock(this.decayClock),
-              set(this.wasRunningBeforeTap, clockRunning(this.springClock)),
-              stopClock(this.springClock),
-            ], [
-              cond(eq(this.tapState, State.END), cond(this.wasRunningBeforeTap, startClock(this.springClock))),
-            ]))}/>
+            <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), stopClock(this.decayClock)))}/>
             <PanGestureHandler
               waitFor={this.master}
               ref={this.panRef}
