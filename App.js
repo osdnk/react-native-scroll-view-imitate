@@ -56,12 +56,11 @@ const {
 
 const { set, cond, onChange, block, eq, greaterOrEq, call, not, defined, max, add, and, sqrt, Value, abs, spring, or, divide, greaterThan, sub,event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated
 
-function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll) {
+function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster) {
   const prev = new Animated.Value(0)
   const limitedVal = new Animated.Value(0)
   const diffPres = new Animated.Value(0)
   const flagWasRunSpring = new Animated.Value(0)
-  const wasRunMaster = new Animated.Value(0)
   const accumulativeOffset = new Animated.Value(0);
   return block([
     cond(eq(state, State.BEGAN),[
@@ -71,14 +70,14 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
       stopClock(masterClockForOverscroll),
       set(wasRunMaster, 0),
     ], [
-      cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), flagWasRunSpring),
+      cond(or(and(eq(state, State.END), or(lessThan(limitedVal, min), greaterThan(limitedVal, max))), and(flagWasRunSpring, not(clockRunning(springClock)))),
         [
           set(flagWasRunSpring, 1),
           cond(lessThan(limitedVal, min),
-            set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), min))
+            set(limitedVal, runSpring(springClock, limitedVal, velocity, min))
           ),
           cond(greaterThan(limitedVal, max),
-            set(limitedVal, runSpring(springClock, limitedVal, diff(limitedVal), max))
+            set(limitedVal, runSpring(springClock, limitedVal, velocity, max))
           ),
         ],
         [
@@ -122,10 +121,11 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
               ),*!/
             ]
           ),*/
-          set(diffPres, sub(prev, val)),
-          set(prev, val),
+
         ]
       ),
+      set(diffPres, sub(prev, val)),
+      set(prev, val),
     ]),
     //limitedVal
     cond(greaterOrEq(limitedVal, 0), [
@@ -144,7 +144,8 @@ function withEnhancedLimits(val, min, max, state, springClock, masterOffseted, m
      // ),
       cond(and(eq(state, State.END), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))),[
         set(masterVelocity, divide(velocity, 1)),
-        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, 1), snapPoint, dampingForMaster, wasRunMaster))
+        set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, divide(velocity, 1), snapPoint, dampingForMaster, wasRunMaster)),
+        set(masterVelocity, 0)
       ]),
       0
     ], limitedVal)
@@ -350,6 +351,8 @@ export default class Example extends Component {
     const dragY = plainDragY
     //cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
     //const Y = cond(eq(snapPoint, snapPoints[0]), plainDragY, 0)
+    this.springClock = new Clock()
+
 
     const masterClock = new Clock()
     const masterClockForOverscroll = new Clock()
@@ -361,7 +364,11 @@ export default class Example extends Component {
 
     //const shouldTriggerSpring = new Animated.Value(0);
 
+    const wasRunMasterForOverscroll = new Animated.Value(0)
+
+
     this.translateMaster = block([
+   //   cond(eq(panState, State.END), set(dragMasterY, 0)),
       cond(eq(panMasterState, State.END),
         [
         // set(masterOffset, add(masterOffset, dragMasterY)),
@@ -369,15 +376,22 @@ export default class Example extends Component {
          cond(or(clockRunning(masterClock), not(wasRun)),
           set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun))
          ),
+      //    set(dragMasterY, 0),
         ],
         [
-          stopClock(masterClock),
+        //  cond(eq(panMasterState, State.BEGAN),set(dragMasterY, 0)),
+          cond(eq(panMasterState, State.BEGAN),
+
+            stopClock(this.springClock),
+          ),
+            stopClock(masterClock),
           set(preventDecaying, 1),
           set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
           set(prevMasterDrag, dragMasterY),
           cond(eq(panMasterState, State.BEGAN),
             [
-              set(dragMasterY, 0),
+
+            //  set(wasRunMasterForOverscroll, 0),
               stopClock(masterClockForOverscroll),
               set(wasRun, 0),
             ]
@@ -386,7 +400,8 @@ export default class Example extends Component {
        //   set(masterOffseted, add(dragMasterY, masterOffset)),
         ]
       ),
-      max(masterOffseted, snapPoints[0])
+    masterOffseted
+    //  max(masterOffseted, snapPoints[0])
     ])
 
     this.handleTap = event([
@@ -398,8 +413,7 @@ export default class Example extends Component {
     ])
 
     this.decayClock = new Clock()
-    this.springClock = new Clock()
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll)
+    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), -2000, 0, panState, this.springClock, masterOffseted, masterClock, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll)
   }
 
   panRef = React.createRef();
