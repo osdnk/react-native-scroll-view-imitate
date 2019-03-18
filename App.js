@@ -262,6 +262,8 @@ class BottomSheetBehavior extends Component {
     const diffPres = new Animated.Value(0);
     const flagWasRunSpring = new Animated.Value(0);
     const justEndedIfEnded = new Animated.Value(1);
+    const wasEndedMasterAfterInner = new Animated.Value(1);
+    const prevMaster = new Animated.Value(1);
     const prevState = new Animated.Value(0);
 
     const rev = new Animated.Value(0);
@@ -289,7 +291,10 @@ class BottomSheetBehavior extends Component {
             set(limitedVal, 0)
           ]),
           cond(not(eq(this.panState, State.END)), set(justEndedIfEnded, 1)),
-          cond(and(eq(this.panState, State.END), not(eq(this.panMasterState, State.ACTIVE)), not(eq(this.panMasterState, State.BEGAN)), or(clockRunning(this.masterClockForOverscroll), not(wasRunMaster))), [
+          cond(or(eq(this.panState, State.ACTIVE), eq(this.panMasterState, State.ACTIVE)), set(wasEndedMasterAfterInner, 0)),
+          cond(and(eq(prevMaster, State.ACTIVE), eq(this.panMasterState, State.END), eq(this.panState, State.END)), set(wasEndedMasterAfterInner, 1)),
+          set(prevMaster, this.panMasterState),
+          cond(and(eq(this.panState, State.END), not(wasEndedMasterAfterInner), not(eq(this.panMasterState, State.ACTIVE)), not(eq(this.panMasterState, State.BEGAN)), or(clockRunning(this.masterClockForOverscroll), not(wasRunMaster))), [
            // cond(justEndedIfEnded, set(this.masterVelocity, diff(val))),
             set(this.masterVelocity, cond(justEndedIfEnded, diff(val), this.velocity)),
             set(masterOffseted, runSpring(this.masterClockForOverscroll, masterOffseted, diff(val), this.snapPoint, dampingForMaster, wasRunMaster)),
