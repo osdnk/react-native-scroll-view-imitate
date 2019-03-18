@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { StyleSheet, View, Button, Dimensions, Text, Platform } from 'react-native';
+import { StyleSheet, View, TouchableWithoutFeedback, Dimensions, Text, Platform, Image } from 'react-native';
 import {
   DangerZone, GestureHandler
 } from 'expo';
@@ -380,7 +380,6 @@ class BottomSheetBehavior extends Component {
     return (
         <Animated.View style={{
           width: '100%',
-          overflow: 'hidden',
           position: 'absolute',
           zIndex: 100,
           transform: [
@@ -411,6 +410,7 @@ class BottomSheetBehavior extends Component {
           <View
             style={{
               height: this.props.snapPoints[0] - this.state.heightOfHeader,
+              overflow: 'hidden'
             }}
           >
 
@@ -450,25 +450,29 @@ class BottomSheetBehavior extends Component {
 
 export default class Example extends React.Component {
   renderInner = () => (
-    <React.Fragment>
-      {[...Array(60)].map((e, i) => (
-        <View key={i} style={{ height: 40, backgroundColor: `#${i % 10}88424` }}>
-          <Text>
-            computed
-          </Text>
-        </View>
-      ))}
-    </React.Fragment>
+    <View style={styles.panel}>
+      <Text style={styles.panelTitle}>San Francisco Airport</Text>
+      <Text style={styles.panelSubtitle}>
+        International Airport - 40 miles away
+      </Text>
+      <View style={styles.panelButton}>
+        <Text style={styles.panelButtonTitle}>Directions</Text>
+      </View>
+      <View style={styles.panelButton}>
+        <Text style={styles.panelButtonTitle}>Search Nearby</Text>
+      </View>
+      <Image
+        style={styles.photo}
+        source={require('./assets/airport-photo.jpg')}
+      />
+    </View>
   );
 
   renderHeader = () => (
-    <View style={{
-      height: 40,
-      backgroundColor: 'red'
-    }}>
-      <Text>
-        123
-      </Text>
+    <View style={styles.header}>
+      <View style={styles.panelHeader}>
+        <View style={styles.panelHandle} />
+      </View>
     </View>
   )
 
@@ -484,25 +488,10 @@ export default class Example extends React.Component {
           renderHeader = {this.renderHeader}
           initialSnap = {1}
         />
-          <Button
-            onPress={() => this.bs.current.snapTo(0)}
-            title="0"
-          />
-          <Button
-            onPress={() => this.bs.current.snapTo(1)}
-            title="1"
-          />
-          <Button
-            onPress={() => this.bs.current.snapTo(2)}
-            style={{
-              zIndex: 0
-            }}
-            title="2"
-          />
-          <Button
-            onPress={() => this.bs.current.snapTo(3)}
-            title="3"
-          />
+        <TouchableWithoutFeedback onPress={() => this.bs.current.snapTo(0)}>
+          <Image style={styles.map} source={require('./assets/map-bg.jpg')} />
+        </TouchableWithoutFeedback>
+
       </View>
     )
   }
@@ -518,6 +507,67 @@ const styles = StyleSheet.create({
   box: {
     width: IMAGE_SIZE,
     height: IMAGE_SIZE,
+  },
+  panelContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  panel: {
+    height: 600,
+    padding: 20,
+    backgroundColor: '#f7f5eee8',
+
+  },
+  header: {
+    backgroundColor: '#f7f5eee8',
+    shadowColor: '#000000',
+    paddingTop: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  panelHeader: {
+    alignItems: 'center',
+  },
+  panelHandle: {
+    width: 40,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00000040',
+    marginBottom: 10,
+  },
+  panelTitle: {
+    fontSize: 27,
+    height: 35,
+  },
+  panelSubtitle: {
+    fontSize: 14,
+    color: 'gray',
+    height: 30,
+    marginBottom: 10,
+  },
+  panelButton: {
+    padding: 20,
+    borderRadius: 10,
+    backgroundColor: '#318bfb',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  panelButtonTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  photo: {
+    width: '100%',
+    height: 225,
+    marginTop: 30,
+  },
+  map: {
+    height: '100%',
+    width: '100%',
   },
 });
 
