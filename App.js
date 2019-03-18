@@ -14,6 +14,7 @@ const {
 
 const { height } = Dimensions.get('window');
 
+
 const P = (android, ios) => Platform.OS === 'ios' ? ios : android;
 
 const magic = {
@@ -259,10 +260,12 @@ class BottomSheetBehavior extends Component {
     const diffPres = new Animated.Value(0);
     const flagWasRunSpring = new Animated.Value(0);
     const justEndedIfEnded = new Animated.Value(1);
+    const prevState = new Animated.Value(0);
+
     const rev = new Animated.Value(0);
     return block([
       set(rev, limitedVal),
-      cond(eq(this.panState, State.BEGAN), [
+      cond(or(eq(this.panState, State.BEGAN), and(eq(this.panState, State.ACTIVE), eq(prevState, State.END))), [
         set(prev, val),
         set(flagWasRunSpring, 0),
         stopClock(this.masterClockForOverscroll),
