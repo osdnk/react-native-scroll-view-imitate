@@ -149,6 +149,7 @@ export class BottomSheetBehavior extends Component {
     initialSnap: 0,
     enabledManualSnapping: true,
     enabledGestureInteraction: true,
+    enabledInnerScrolling: true
   };
 
   decayClock = new Clock();
@@ -242,9 +243,9 @@ export class BottomSheetBehavior extends Component {
 
   handlePan = event([{
     nativeEvent: ({
-      translationY: this.dragY,
-      state: this.panState,
-      velocityY: this.velocity
+      translationY: this.props.enabledInnerScrolling ? this.dragY : this.dragMasterY,
+      state: this.props.enabledInnerScrolling ? this.panState : this.panMasterState,
+      velocityY: this.props.enabledInnerScrolling ? this.velocity : this.masterVelocity
     })
   }]);
 
@@ -462,6 +463,9 @@ export class BottomSheetBehavior extends Component {
           </PanGestureHandler>
           <Animated.Code
             exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), stopClock(this.decayClock)))}/>
+          {this.props.callbackNode &&
+          <Animated.Code
+            exec={onChange(this.translateMaster, set(this.props.callbackNode, divide(this.translateMaster, this.height)))}/>}
         </View>
       </Animated.View>
       </React.Fragment>

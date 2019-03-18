@@ -3,11 +3,16 @@ import { Text, View, FlatList, StyleSheet, TouchableOpacity, YellowBox } from 'r
 import { createStackNavigator, createAppContainer } from 'react-navigation';
 
 import Map from './Map';
+import BlurToolbar from './BlurToolbar';
 
 const SCREENS = {
   map: {
     screen: Map,
     title: 'Apple Map',
+  },
+  toolbar: {
+    screen: BlurToolbar,
+    title: 'Blur Toolbar',
   },
 };
 
