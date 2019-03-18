@@ -5,6 +5,7 @@ import { createStackNavigator, createAppContainer } from 'react-navigation';
 import Map from './Map';
 import BlurToolbar from './BlurToolbar';
 import Imperative from './Imperative';
+import Test from './Test';
 
 const SCREENS = {
   map: {
@@ -18,6 +19,10 @@ const SCREENS = {
   imperative: {
     screen: Imperative,
     title: 'Imperative managed view',
+  },
+  test: {
+    screen: Test,
+    title: 'Test',
   },
 };
 
