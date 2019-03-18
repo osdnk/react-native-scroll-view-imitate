@@ -40,7 +40,7 @@ export default class Example extends React.Component {
       <View style={styles.container}>
         <BottomSheetBehavior
           ref={this.bs}
-          snapPoints = {[500, 30]}
+          snapPoints = {[500, 50]}
           renderContent = {this.renderInner}
           renderHeader = {this.renderHeader}
           initialSnap = {1}
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   header: {
       width: '100%',
-      height: 30,
+      height: 50,
   },
   panelHeader: {
     alignItems: 'center',

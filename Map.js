@@ -39,7 +39,7 @@ export default class Example extends React.Component {
       <View style={styles.container}>
         <BottomSheetBehavior
           ref={this.bs}
-          snapPoints = {[500, 400, 200, 100]}
+          snapPoints = {[500, 250, 0]}
           renderContent = {this.renderInner}
           renderHeader = {this.renderHeader}
           initialSnap = {1}

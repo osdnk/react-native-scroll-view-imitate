@@ -4,6 +4,7 @@ import { createStackNavigator, createAppContainer } from 'react-navigation';
 
 import Map from './Map';
 import BlurToolbar from './BlurToolbar';
+import Imperative from './Imperative';
 
 const SCREENS = {
   map: {
@@ -13,6 +14,10 @@ const SCREENS = {
   toolbar: {
     screen: BlurToolbar,
     title: 'Blur Toolbar',
+  },
+  imperative: {
+    screen: Imperative,
+    title: 'Imperative managed view',
   },
 };
 
