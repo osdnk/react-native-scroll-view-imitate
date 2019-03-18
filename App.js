@@ -285,9 +285,10 @@ class BottomSheetBehavior extends Component {
           ]),
           cond(not(eq(this.panState, State.END)), set(justEndedIfEnded, 1)),
           cond(and(eq(this.panState, State.END), not(eq(this.panMasterState, State.ACTIVE)), not(eq(this.panMasterState, State.BEGAN)), or(clockRunning(this.masterClockForOverscroll), not(wasRunMaster))), [
-            cond(justEndedIfEnded, set(this.masterVelocity, diff(val))),
+           // cond(justEndedIfEnded, set(this.masterVelocity, diff(val))),
+            set(this.masterVelocity, cond(justEndedIfEnded, diff(val), this.velocity)),
             set(masterOffseted, runSpring(this.masterClockForOverscroll, masterOffseted, diff(val), this.snapPoint, dampingForMaster, wasRunMaster)),
-            cond(justEndedIfEnded, set(this.masterVelocity, 0))
+            set(this.masterVelocity, 0)
           ]),
           cond(eq(this.panState, State.END), set(justEndedIfEnded, 0)),
           set(this.preventDecaying, 1),
