@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { StyleSheet, View, Dimensions, Text, Platform } from 'react-native';
+import { StyleSheet, View, Button, Dimensions, Text, Platform } from 'react-native';
 import {
   DangerZone, GestureHandler
 } from 'expo';
@@ -48,50 +48,6 @@ const {
 
 const { set, cond, onChange, block, eq, greaterOrEq, not, defined, max, add, and, Value, spring, or, divide, greaterThan, sub, event, diff, multiply, clockRunning, startClock, stopClock, decay, Clock, lessThan } = Animated;
 
-function withEnhancedLimits(val, min, max, state, masterOffseted, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMaster, ms, pd) {
-  const prev = new Animated.Value(0);
-  const limitedVal = new Animated.Value(0);
-  const diffPres = new Animated.Value(0);
-  const flagWasRunSpring = new Animated.Value(0);
-  const justEndedIfEnded = new Animated.Value(1);
-  const rev = new Animated.Value(0);
-  return block([
-    set(rev, limitedVal),
-    cond(eq(state, State.BEGAN), [
-      set(prev, val),
-      set(flagWasRunSpring, 0),
-      stopClock(masterClockForOverscroll),
-      set(wasRunMaster, 0),
-    ], [
-        set(limitedVal, add(limitedVal, sub(val, prev))),
-        cond(lessThan(limitedVal, min), set(limitedVal, min)),
-    ]),
-    set(diffPres, sub(prev, val)),
-    set(prev, val),
-    cond(or(greaterOrEq(limitedVal, 0),
-      greaterThan(masterOffseted, 0))
-      , [
-        cond(eq(state, State.ACTIVE),
-          set(masterOffseted, sub(masterOffseted, diffPres)),
-        ),
-        cond(greaterThan(masterOffseted, 0), [
-          set(limitedVal, 0)
-        ]),
-        cond(not(eq(state, State.END)), set(justEndedIfEnded, 1)),
-        cond(and(eq(state, State.END), not(eq(ms, State.ACTIVE)), not(eq(ms, State.BEGAN)), or(clockRunning(masterClockForOverscroll), not(wasRunMaster))), [
-          cond(justEndedIfEnded, set(masterVelocity, diff(val))),
-          set(masterOffseted, runSpring(masterClockForOverscroll, masterOffseted, diff(val), snapPoint, dampingForMaster, wasRunMaster)),
-          cond(justEndedIfEnded, set(masterVelocity, 0))
-        ]),
-        cond(eq(state, State.END), set(justEndedIfEnded, 0)),
-        set(pd, 1),
-        0
-      ], [
-        set(pd, 0),
-        limitedVal
-      ])
-  ]);
-}
 
 function runDecay(clock, value, velocity, wasStartedFromBegin) {
   const state = {
@@ -163,7 +119,7 @@ function withDecaying(drag, state, decayClock, velocity, prevent) {
 }
 
 
-function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0) {
+function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, isManuallySet = 0) {
   const state = {
     finished: new Value(0),
     velocity: new Value(0),
@@ -187,7 +143,7 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0) 
       set(state.velocity, velocity),
       set(state.position, value),
       set(config.toValue, dest),
-      cond(wasRun, 0, startClock(clock)),
+      cond(and(wasRun, not(isManuallySet)), 0, startClock(clock)),
       cond(defined(wasRun), set(wasRun, 1)),
     ]),
     spring(clock, state, config),
@@ -196,59 +152,37 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0) 
   ];
 }
 
+
 export default class Example extends Component {
   static defaultProps = {
-    snapPoints: [600, 300, 150],
+    snapPoints: [450, 300, 150, 0],
     initialSnap: 0,
   };
 
+  decayClock = new Clock();
+  panState = new Value(0);
+  tapState = new Value(0);
+  velocity = new Value(0);
+  panMasterState = new Value(State.END);
+  masterVelocity = new Value(0);
+  isManuallySetValue = new Animated.Value(0);
+  afterManuallySetValue = new Animated.Value(0);
+  manuallySetValue = new Animated.Value(0);
+  masterClockForOverscroll = new Clock();
+  preventDecaying = new Animated.Value(0);
+  dragMasterY = new Value(0);
+  dragY = new Value(0);
   constructor(props) {
     super(props);
-    const plainDragY = new Value(0);
-    const panState = new Value(0);
-    this.tapState = new Value(0);
-    const velocity = new Value(0);
-
-    const dragMasterY = new Value(0);
-    const panMasterState = new Value(0);
-    const masterVelocity = new Value(0);
-
-
-    this.handlePan = event([
-      {
-        nativeEvent: ({
-          translationY: plainDragY,
-          state: panState,
-          velocityY: velocity
-        })
-      },
-    ]);
-
-
-    this.handleMasterPan = event([
-      {
-        nativeEvent: ({
-          translationY: dragMasterY,
-          state: panMasterState,
-          velocityY: masterVelocity
-        })
-      },
-    ]);
-
     this.state = Example.getDerivedStateFromProps(props);
     const { snapPoints } = this.state;
     const middlesOfSnapPoints = [];
     for (let i = 1; i < snapPoints.length; i++) {
       middlesOfSnapPoints.push(divide(add(snapPoints[i - 1] + snapPoints[i]), 2));
     }
-
-
     const masterOffseted = new Animated.Value(snapPoints[props.initialSnap]);
-
     // destination point is a approximation of movement if finger released
-    const destinationPoint = add(masterOffseted, multiply(tossForMaster, masterVelocity));
-
-
+    const destinationPoint = add(masterOffseted, multiply(tossForMaster, this.masterVelocity),);
     // method for generating condition for finding the nearest snap point
     const currentSnapPoint = (i = 0) => i + 1 === snapPoints.length ?
       snapPoints[i] :
@@ -258,35 +192,35 @@ export default class Example extends Component {
         currentSnapPoint(i + 1)
       );
     // current snap point desired
-    const snapPoint = currentSnapPoint();
-
-    const dragY = plainDragY;
-
+    this.snapPoint = currentSnapPoint();
 
     const masterClock = new Clock();
-    const masterClockForOverscroll = new Clock();
-
-
     const prevMasterDrag = new Animated.Value(0);
     const wasRun = new Animated.Value(0);
-    const preventDecaying = new Animated.Value(0);
-    const wasRunMasterForOverscroll = new Animated.Value(0);
     this.translateMaster = block([
-      cond(eq(panMasterState, State.END),
+      cond(eq(this.panMasterState, State.END),
         [
           set(prevMasterDrag, 0),
-          cond(or(clockRunning(masterClock), not(wasRun)),
-            set(masterOffseted, runSpring(masterClock, masterOffseted, masterVelocity, snapPoint, dampingForMaster, wasRun))
+          cond(or(clockRunning(masterClock), not(wasRun), this.isManuallySetValue),
+            [
+              cond(this.isManuallySetValue, stopClock(masterClock)),
+              set(masterOffseted,
+                runSpring(masterClock, masterOffseted, this.masterVelocity,
+                  cond(this.isManuallySetValue, this.manuallySetValue, this.snapPoint),
+                  dampingForMaster, wasRun, this.isManuallySetValue)
+              ),
+              set(this.isManuallySetValue, 0)
+            ]
           ),
         ],
         [
           stopClock(masterClock),
-          set(preventDecaying, 1),
-          set(masterOffseted, add(masterOffseted, sub(dragMasterY, prevMasterDrag))),
-          set(prevMasterDrag, dragMasterY),
-          cond(eq(panMasterState, State.BEGAN),
+          set(this.preventDecaying, 1),
+          set(masterOffseted, add(masterOffseted, sub(this.dragMasterY, prevMasterDrag))),
+          set(prevMasterDrag, this.dragMasterY),
+          cond(eq(this.panMasterState, State.BEGAN),
             [
-              stopClock(masterClockForOverscroll),
+              stopClock(this.masterClockForOverscroll),
               set(wasRun, 0),
             ]
           ),
@@ -295,19 +229,83 @@ export default class Example extends Component {
       max(masterOffseted, snapPoints[0])
     ]);
 
-    this.handleTap = event([
-      {
-        nativeEvent: {
-          state: this.tapState
-        }
-      },
-    ]);
+    this.Y = this.withEnhancedLimits(
+      withDecaying(
+        withPreservingAdditiveOffset(this.dragY, this.panState),
+        this.panState,
+        this.decayClock,
+        this.velocity,
+        this.preventDecaying),
+      masterOffseted);
+  }
 
-    this.decayClock = new Clock();
-    this.Y = withEnhancedLimits(withDecaying(withPreservingAdditiveOffset(dragY, panState), panState, this.decayClock, velocity, preventDecaying), multiply(-1, add(this.state.heightOfContent, this.state.heightOfHeaderAnimated)), 0, panState, masterOffseted, snapPoint, masterVelocity, velocity, masterClockForOverscroll, wasRunMasterForOverscroll, panMasterState, preventDecaying);
+  handleMasterPan = event([{ nativeEvent: ({
+    translationY: this.dragMasterY,
+    state: this.panMasterState,
+    velocityY: this.masterVelocity
+  })}]);
+
+  handlePan = event([{ nativeEvent: ({
+    translationY: this.dragY,
+    state: this.panState,
+    velocityY: this.velocity
+  })}]);
+
+  handleTap = event([{ nativeEvent: { state: this.tapState } }]);
+
+  withEnhancedLimits(val, masterOffseted) {
+    const wasRunMaster = new Animated.Value(0)
+    const min = multiply(-1, add(this.state.heightOfContent, this.state.heightOfHeaderAnimated))
+    const prev = new Animated.Value(0);
+    const limitedVal = new Animated.Value(0);
+    const diffPres = new Animated.Value(0);
+    const flagWasRunSpring = new Animated.Value(0);
+    const justEndedIfEnded = new Animated.Value(1);
+    const rev = new Animated.Value(0);
+    return block([
+      set(rev, limitedVal),
+      cond(eq(this.panState, State.BEGAN), [
+        set(prev, val),
+        set(flagWasRunSpring, 0),
+        stopClock(this.masterClockForOverscroll),
+        set(wasRunMaster, 0),
+      ], [
+        set(limitedVal, add(limitedVal, sub(val, prev))),
+        cond(lessThan(limitedVal, min), set(limitedVal, min)),
+      ]),
+      set(diffPres, sub(prev, val)),
+      set(prev, val),
+      cond(or(greaterOrEq(limitedVal, 0),
+        greaterThan(masterOffseted, 0))
+        , [
+          cond(eq(this.panState, State.ACTIVE),
+            set(masterOffseted, sub(masterOffseted, diffPres)),
+          ),
+          cond(greaterThan(masterOffseted, 0), [
+            set(limitedVal, 0)
+          ]),
+          cond(not(eq(this.panState, State.END)), set(justEndedIfEnded, 1)),
+          cond(and(eq(this.panState, State.END), not(eq(this.panMasterState, State.ACTIVE)), not(eq(this.panMasterState, State.BEGAN)), or(clockRunning(this.masterClockForOverscroll), not(wasRunMaster))), [
+            cond(justEndedIfEnded, set(this.masterVelocity, diff(val))),
+            set(masterOffseted, runSpring(this.masterClockForOverscroll, masterOffseted, diff(val), this.snapPoint, dampingForMaster, wasRunMaster)),
+            cond(justEndedIfEnded, set(this.masterVelocity, 0))
+          ]),
+          cond(eq(this.panState, State.END), set(justEndedIfEnded, 0)),
+          set(this.preventDecaying, 1),
+          0
+        ], [
+          set(this.preventDecaying, 0),
+          limitedVal
+        ])
+    ]);
   }
 
   panRef = React.createRef();
+
+  snapTo = index => {
+    this.manuallySetValue.setValue(this.state.snapPoints[index])
+    this.isManuallySetValue.setValue(1);
+  }
 
   renderInner = () => (
     <React.Fragment>
@@ -320,7 +318,6 @@ export default class Example extends Component {
       ))}
     </React.Fragment>
   );
-
 
   handleLayoutHeader = ({
                           nativeEvent: {
@@ -356,8 +353,31 @@ export default class Example extends Component {
   render() {
     return (
       <View style={styles.container}>
+        <Button
+          onPress={() => this.snapTo(0)}
+          title="0"
+        />
+        <Button
+          onPress={() => this.snapTo(1)}
+          title="1"
+        />
+        <Button
+          onPress={() => this.snapTo(2)}
+          style={{
+            zIndex: 0
+          }}
+          title="2"
+        />
+        <Button
+          onPress={() => this.snapTo(3)}
+          title="3"
+        />
+        <View style={{ height: 400, width: 100, backgroundColor: 'blue', overflow: 'hidden' }}/>
         <Animated.View style={{
           width: '100%',
+          overflow: 'hidden',
+          position: 'absolute',
+          zIndex: 100,
           transform: [
             {
               translateY: this.translateMaster
@@ -374,6 +394,9 @@ export default class Example extends Component {
             onHandlerStateChange={this.handleMasterPan}
           >
             <Animated.View
+              style={{
+                zIndex: 101
+              }}
               onLayout={this.handleLayoutHeader}
             >
               <View style={{
@@ -389,10 +412,10 @@ export default class Example extends Component {
           <View
             style={{
               height: this.props.snapPoints[0] - this.state.heightOfHeader,
-              overflow: 'hidden'
+              backgroundColor: 'blue',
             }}
           >
-            <Animated.Code exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), stopClock(this.decayClock)))}/>
+
             <PanGestureHandler
               waitFor={this.master}
               ref={this.panRef}
@@ -407,7 +430,6 @@ export default class Example extends Component {
                     style={{
                       width: '100%',
                       transform: [
-
                         { translateY: this.Y }
                       ]
                     }}
@@ -418,6 +440,8 @@ export default class Example extends Component {
                 </TapGestureHandler>
               </Animated.View>
             </PanGestureHandler>
+            <Animated.Code
+              exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), stopClock(this.decayClock)))}/>
           </View>
         </Animated.View>
       </View>
