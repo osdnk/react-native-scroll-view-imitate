@@ -152,10 +152,8 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, 
   ];
 }
 
-
-export default class Example extends Component {
+class BottomSheetBehavior extends Component {
   static defaultProps = {
-    snapPoints: [450, 300, 150, 0],
     initialSnap: 0,
   };
 
@@ -166,7 +164,6 @@ export default class Example extends Component {
   panMasterState = new Value(State.END);
   masterVelocity = new Value(0);
   isManuallySetValue = new Animated.Value(0);
-  afterManuallySetValue = new Animated.Value(0);
   manuallySetValue = new Animated.Value(0);
   masterClockForOverscroll = new Clock();
   preventDecaying = new Animated.Value(0);
@@ -174,15 +171,16 @@ export default class Example extends Component {
   dragY = new Value(0);
   constructor(props) {
     super(props);
-    this.state = Example.getDerivedStateFromProps(props);
+    this.state = BottomSheetBehavior.getDerivedStateFromProps(props);
     const { snapPoints } = this.state;
     const middlesOfSnapPoints = [];
     for (let i = 1; i < snapPoints.length; i++) {
-      middlesOfSnapPoints.push(divide(add(snapPoints[i - 1] + snapPoints[i]), 2));
+      middlesOfSnapPoints.push(divide(add(snapPoints[i - 1], snapPoints[i]), 2));
     }
-    const masterOffseted = new Animated.Value(snapPoints[props.initialSnap]);
+    const masterOffseted =
+      new Value(props.snapPoints[0] - props.snapPoints[props.initialSnap]);
     // destination point is a approximation of movement if finger released
-    const destinationPoint = add(masterOffseted, multiply(tossForMaster, this.masterVelocity),);
+    const destinationPoint = add(masterOffseted, multiply(tossForMaster, this.masterVelocity));
     // method for generating condition for finding the nearest snap point
     const currentSnapPoint = (i = 0) => i + 1 === snapPoints.length ?
       snapPoints[i] :
@@ -273,6 +271,7 @@ export default class Example extends Component {
         set(limitedVal, add(limitedVal, sub(val, prev))),
         cond(lessThan(limitedVal, min), set(limitedVal, min)),
       ]),
+      set(prevState, this.panState),
       set(diffPres, sub(prev, val)),
       set(prev, val),
       cond(or(greaterOrEq(limitedVal, 0),
@@ -303,21 +302,9 @@ export default class Example extends Component {
   panRef = React.createRef();
 
   snapTo = index => {
-    this.manuallySetValue.setValue(this.state.snapPoints[index])
+    this.manuallySetValue.setValue(this.state.snapPoints[this.state.propsToNewIncides[index]])
     this.isManuallySetValue.setValue(1);
   }
-
-  renderInner = () => (
-    <React.Fragment>
-      {[...Array(60)].map((e, i) => (
-        <View key={i} style={{ height: 40, backgroundColor: `#${i % 10}88424` }}>
-          <Text>
-            computed
-          </Text>
-        </View>
-      ))}
-    </React.Fragment>
-  );
 
   handleLayoutHeader = ({
                           nativeEvent: {
@@ -340,11 +327,33 @@ export default class Example extends Component {
 
 
   static getDerivedStateFromProps(props, state) {
+    let snapPoints;
+    const sortedPropsSnapPints = props.snapPoints.map((s, i) => {
+      if (typeof s === 'number') {
+        return { val: s, ind:i }
+      } else if (typeof s === 'string') {
+        return { val: Number(s.split('%')[0]) * height / 100, ind: i }
+      } else {
+        // exception
+      }
+    }).sort(({ val: a }, { val: b }) => a < b)
+    if (state && state.snapPoints) {
+      state.snapPoints.forEach((s, i) => s.setValue(sortedPropsSnapPints[0].val - sortedPropsSnapPints[i].val))
+      snapPoints = state.snapPoints
+    } else {
+      snapPoints = sortedPropsSnapPints.map(p => new Value(sortedPropsSnapPints[0].val - p.val))
+    }
+
+    const propsToNewIncides = {};
+    sortedPropsSnapPints.forEach(({ ind }, i) => propsToNewIncides[ind] = i )
+
+
     return {
+      propsToNewIncides,
       heightOfHeaderAnimated: (state && state.heightOfHeaderAnimated) || new Animated.Value(0),
       heightOfContent: (state && state.heightOfContent) || new Animated.Value(0),
       initSnap: height - props.snapPoints[0],
-      snapPoints: props.snapPoints.map(p => props.snapPoints[0] - p)
+      snapPoints
     };
   }
 
@@ -352,27 +361,6 @@ export default class Example extends Component {
 
   render() {
     return (
-      <View style={styles.container}>
-        <Button
-          onPress={() => this.snapTo(0)}
-          title="0"
-        />
-        <Button
-          onPress={() => this.snapTo(1)}
-          title="1"
-        />
-        <Button
-          onPress={() => this.snapTo(2)}
-          style={{
-            zIndex: 0
-          }}
-          title="2"
-        />
-        <Button
-          onPress={() => this.snapTo(3)}
-          title="3"
-        />
-        <View style={{ height: 400, width: 100, backgroundColor: 'blue', overflow: 'hidden' }}/>
         <Animated.View style={{
           width: '100%',
           overflow: 'hidden',
@@ -399,20 +387,12 @@ export default class Example extends Component {
               }}
               onLayout={this.handleLayoutHeader}
             >
-              <View style={{
-                height: 40,
-                backgroundColor: 'red'
-              }}>
-                <Text>
-                  123
-                </Text>
-              </View>
+              {this.props.renderHeader && this.props.renderHeader()}
             </Animated.View>
           </PanGestureHandler>
           <View
             style={{
               height: this.props.snapPoints[0] - this.state.heightOfHeader,
-              backgroundColor: 'blue',
             }}
           >
 
@@ -435,7 +415,7 @@ export default class Example extends Component {
                     }}
                     onLayout={this.handleLayoutContent}
                   >
-                    {this.renderInner()}
+                    {this.props.renderContent && this.props.renderContent()}
                   </Animated.View>
                 </TapGestureHandler>
               </Animated.View>
@@ -444,8 +424,67 @@ export default class Example extends Component {
               exec={onChange(this.tapState, cond(eq(this.tapState, State.BEGAN), stopClock(this.decayClock)))}/>
           </View>
         </Animated.View>
-      </View>
     );
+  }
+}
+
+export default class Example extends React.Component {
+  renderInner = () => (
+    <React.Fragment>
+      {[...Array(60)].map((e, i) => (
+        <View key={i} style={{ height: 40, backgroundColor: `#${i % 10}88424` }}>
+          <Text>
+            computed
+          </Text>
+        </View>
+      ))}
+    </React.Fragment>
+  );
+
+  renderHeader = () => (
+    <View style={{
+      height: 40,
+      backgroundColor: 'red'
+    }}>
+      <Text>
+        123
+      </Text>
+    </View>
+  )
+
+  bs = React.createRef()
+
+  render() {
+    return (
+      <View style={styles.container}>
+        <BottomSheetBehavior
+          ref={this.bs}
+          snapPoints = {[450, 300, 100, 0]}
+          renderContent = {this.renderInner}
+          renderHeader = {this.renderHeader}
+
+        />
+          <Button
+            onPress={() => this.bs.current.snapTo(0)}
+            title="0"
+          />
+          <Button
+            onPress={() => this.bs.current.snapTo(1)}
+            title="1"
+          />
+          <Button
+            onPress={() => this.bs.current.snapTo(2)}
+            style={{
+              zIndex: 0
+            }}
+            title="2"
+          />
+          <Button
+            onPress={() => this.bs.current.snapTo(3)}
+            title="3"
+          />
+      </View>
+    )
   }
 }
 
