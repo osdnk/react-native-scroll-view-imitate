@@ -156,6 +156,8 @@ function runSpring(clock, value, velocity, dest, damping = damping, wasRun = 0, 
 class BottomSheetBehavior extends Component {
   static defaultProps = {
     initialSnap: 0,
+    enabledManualSnapping: true,
+    enabledGestureInteraction: true,
   };
 
   decayClock = new Clock();
@@ -173,13 +175,13 @@ class BottomSheetBehavior extends Component {
   constructor(props) {
     super(props);
     this.state = BottomSheetBehavior.getDerivedStateFromProps(props);
-    const { snapPoints } = this.state;
+    const { snapPoints, init } = this.state;
     const middlesOfSnapPoints = [];
     for (let i = 1; i < snapPoints.length; i++) {
       middlesOfSnapPoints.push(divide(add(snapPoints[i - 1], snapPoints[i]), 2));
     }
     const masterOffseted =
-      new Value(props.snapPoints[0] - props.snapPoints[props.initialSnap]);
+      new Value(init);
     // destination point is a approximation of movement if finger released
     const destinationPoint = add(masterOffseted, multiply(tossForMaster, this.masterVelocity));
     // method for generating condition for finding the nearest snap point
@@ -274,7 +276,7 @@ class BottomSheetBehavior extends Component {
         set(limitedVal, add(limitedVal, sub(val, prev))),
         cond(lessThan(limitedVal, min), set(limitedVal, min)),
       ]),
-      set(prevState, this.panState),
+      set(prevState, this.panState), // some iOS shit
       set(diffPres, sub(prev, val)),
       set(prev, val),
       cond(or(greaterOrEq(limitedVal, 0),
@@ -306,6 +308,9 @@ class BottomSheetBehavior extends Component {
   panRef = React.createRef();
 
   snapTo = index => {
+    if (!this.props.enabledManualSnapping) {
+      return
+    }
     this.manuallySetValue.setValue(this.state.snapPoints[this.state.propsToNewIncides[index]])
     this.isManuallySetValue.setValue(1);
   }
@@ -351,8 +356,11 @@ class BottomSheetBehavior extends Component {
     const propsToNewIncides = {};
     sortedPropsSnapPints.forEach(({ ind }, i) => propsToNewIncides[ind] = i )
 
+    const { initialSnap } = props;
+
 
     return {
+      init: sortedPropsSnapPints[0].val - sortedPropsSnapPints[propsToNewIncides[initialSnap]].val,
       propsToNewIncides,
       heightOfHeaderAnimated: (state && state.heightOfHeaderAnimated) || new Animated.Value(0),
       heightOfContent: (state && state.heightOfContent) || new Animated.Value(0),
@@ -380,6 +388,7 @@ class BottomSheetBehavior extends Component {
           ]
         }}>
           <PanGestureHandler
+            enabled={this.props.enabledGestureInteraction}
             ref={this.master}
             waitFor={this.panRef}
             onGestureEvent={this.handleMasterPan}
@@ -401,6 +410,7 @@ class BottomSheetBehavior extends Component {
           >
 
             <PanGestureHandler
+              enabled={this.props.enabledGestureInteraction}
               waitFor={this.master}
               ref={this.panRef}
               onGestureEvent={this.handlePan}
@@ -408,6 +418,7 @@ class BottomSheetBehavior extends Component {
             >
               <Animated.View>
                 <TapGestureHandler
+                  enabled={this.props.enabledGestureInteraction}
                   onHandlerStateChange={this.handleTap}
                 >
                   <Animated.View
@@ -466,7 +477,7 @@ export default class Example extends React.Component {
           snapPoints = {[450, 300, 100, 0]}
           renderContent = {this.renderInner}
           renderHeader = {this.renderHeader}
-
+          initialSnap = {1}
         />
           <Button
             onPress={() => this.bs.current.snapTo(0)}
